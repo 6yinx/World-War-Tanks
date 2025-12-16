@@ -36,7 +36,7 @@ window.GameScene = class GameScene extends Phaser.Scene {
         this.POWER_MULTIPLIER = 4; // Higher multiplier for distance
         this.DIRECT_HIT_DAMAGE = 50;
         this.NEAR_HIT_DAMAGE = 40;
-        this.NEAR_HIT_RADIUS = 120;
+        this.NEAR_HIT_RADIUS = 200;
 
         // Initialize audio context for sound effects
         this.initAudio();
@@ -911,7 +911,7 @@ window.GameScene = class GameScene extends Phaser.Scene {
     // EXPLOSION (Phase 4)
     // ==========================================
     createExplosion(x, y, isDirect) {
-        const size = isDirect ? 50 : 30;
+        const size = isDirect ? 80 : 50;
 
         // Play explosion sound
         this.playExplosionSound(isDirect);

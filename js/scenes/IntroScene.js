@@ -11,7 +11,7 @@
  * Total duration: ~10-15 seconds (skippable)
  */
 
-class IntroScene extends Phaser.Scene {
+window.IntroScene = class IntroScene extends Phaser.Scene {
     constructor() {
         super({ key: 'IntroScene' });
 

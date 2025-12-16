@@ -7,7 +7,7 @@
  * Phase 5: Polish (Optimized, clean, mobile-ready)
  */
 
-class GameScene extends Phaser.Scene {
+window.GameScene = class GameScene extends Phaser.Scene {
     constructor() {
         super({ key: 'GameScene' });
     }

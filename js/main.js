@@ -14,20 +14,37 @@
  * - Transitions to GameScene
  */
 
-const config = {
-    type: Phaser.AUTO,
-    scale: {
-        mode: Phaser.Scale.RESIZE,
-        width: '100%',
-        height: '100%'
+// Initialize the game
+window.onload = () => {
+    if (typeof window.IntroScene === 'undefined' || typeof window.GameScene === 'undefined') {
+        console.error('Scenes not loaded!');
+        return;
     }
+
+    const config = {
+        type: Phaser.AUTO,
+        scale: {
+            mode: Phaser.Scale.RESIZE,
+            parent: 'game-container',
+            width: '100%',
+            height: '100%'
+        },
+        physics: {
+            default: 'arcade',
+            arcade: {
+                gravity: { y: 500 },
+                debug: false
+            }
+        },
+        backgroundColor: '#1a1a2e',
+        scene: [window.IntroScene, window.GameScene]
+    };
+
+    const game = new Phaser.Game(config);
 };
 
-// Initialize the game
-const game = new Phaser.Game(config);
-
 console.log('World War Tanks initialized');
-console.log('Resolution: 1280x720');
+console.log('Resolution: Dynamic (Resize)');
 console.log('Physics: Arcade with Y-gravity (500)');
 console.log('Camera: Fixed (no movement)');
 console.log('Scene Flow: IntroScene → GameScene');

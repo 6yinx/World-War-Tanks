@@ -34,9 +34,9 @@ window.GameScene = class GameScene extends Phaser.Scene {
         this.MAX_POWER = 1200;  // Increased from 800
         this.MIN_POWER = 150;   // Increased minimum too
         this.POWER_MULTIPLIER = 4; // Higher multiplier for distance
-        this.DIRECT_HIT_DAMAGE = 35;
-        this.NEAR_HIT_DAMAGE = 15;
-        this.NEAR_HIT_RADIUS = 80;
+        this.DIRECT_HIT_DAMAGE = 50;
+        this.NEAR_HIT_DAMAGE = 40;
+        this.NEAR_HIT_RADIUS = 120;
 
         // Initialize audio context for sound effects
         this.initAudio();
@@ -803,6 +803,10 @@ window.GameScene = class GameScene extends Phaser.Scene {
         this.applyDamage(tankIndex, this.DIRECT_HIT_DAMAGE);
         this.createExplosion(this.projectile.x, this.projectile.y, true);
         this.flashTank(hitTank);
+
+        // Apply splash damage to other tanks
+        this.checkNearHits(this.projectile.x, this.projectile.y, tankIndex);
+
         this.destroyProjectile();
 
         if (hitTank.health <= 0) {
@@ -812,18 +816,28 @@ window.GameScene = class GameScene extends Phaser.Scene {
         }
     }
 
-    checkNearHits(x, y) {
+    checkNearHits(x, y, directHitIndex = -1) {
         this.tanks.forEach((tank, index) => {
+            // Skip the tank that took a direct hit
+            if (index === directHitIndex) return;
+
+            // Skip shooter to avoid self-damage (gameplay choice)
             if (index === this.projectile.shooter) return;
 
             const distance = Phaser.Math.Distance.Between(x, y, tank.pivotX, tank.pivotY);
 
             if (distance <= this.NEAR_HIT_RADIUS) {
-                this.applyDamage(index, this.NEAR_HIT_DAMAGE);
-                this.flashTank(tank, 0xFFAA00);
+                // Falloff damage calculation: Max damage at center, 0 at radius edge
+                const falloff = 1 - (distance / this.NEAR_HIT_RADIUS);
+                const damage = Math.floor(this.NEAR_HIT_DAMAGE * falloff);
 
-                if (tank.health <= 0) {
-                    this.onTankDestroyed(index);
+                if (damage > 0) {
+                    this.applyDamage(index, damage);
+                    this.flashTank(tank, 0xFFAA00);
+
+                    if (tank.health <= 0) {
+                        this.onTankDestroyed(index);
+                    }
                 }
             }
         });
@@ -969,8 +983,20 @@ window.GameScene = class GameScene extends Phaser.Scene {
             );
 
             if (solution) {
-                // Add some randomness/error
-                const error = Phaser.Math.Between(-30, 30);
+                // Accuracy Logic: 45% chance to aim accurately
+                const isAccurate = Phaser.Math.Between(1, 100) <= 45;
+                let error;
+
+                if (isAccurate) {
+                    // High accuracy: very small error
+                    error = Phaser.Math.Between(-5, 5);
+                } else {
+                    // Low accuracy: large error to ensure miss or poor shot
+                    // Randomly overshoot or undershoot
+                    const errorMag = Phaser.Math.Between(50, 200);
+                    error = Math.random() < 0.5 ? -errorMag : errorMag;
+                }
+
                 const finalPower = Phaser.Math.Clamp(solution.power + error, this.MIN_POWER, this.MAX_POWER);
 
                 // Animate aiming

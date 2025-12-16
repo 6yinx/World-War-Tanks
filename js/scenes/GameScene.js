@@ -253,7 +253,7 @@ class GameScene extends Phaser.Scene {
     // ==========================================
     createTanks() {
         const tankA = this.createTank(200, 605, 0x4A6741, 0x5C7D52, 'Player 1', true);
-        const tankB = this.createTank(1080, 605, 0x8B6914, 0xA67C00, 'Player 2', false);
+        const tankB = this.createTank(1080, 605, 0x8B6914, 0xA67C00, 'Bot', false);
 
         this.tanks = [tankA, tankB];
     }
@@ -552,7 +552,7 @@ class GameScene extends Phaser.Scene {
     }
 
     onPointerDown(pointer) {
-        if (!this.canShoot || this.gameOver) return;
+        if (!this.canShoot || this.gameOver || this.currentPlayerIndex !== 0) return;
 
         const activeTank = this.tanks[this.currentPlayerIndex];
         const distance = Phaser.Math.Distance.Between(
@@ -944,6 +944,82 @@ class GameScene extends Phaser.Scene {
     // ==========================================
     // TURN MANAGEMENT
     // ==========================================
+    // ==========================================
+    // BOT AI
+    // ==========================================
+    botTurn() {
+        this.time.delayedCall(1500, () => {
+            if (this.gameOver) return;
+
+            const botTank = this.tanks[1];
+            const targetTank = this.tanks[0];
+
+            // Calculate solution
+            const solution = this.calculateFiringSolution(
+                botTank.pivotX, botTank.pivotY,
+                targetTank.pivotX, targetTank.pivotY
+            );
+
+            if (solution) {
+                // Add some randomness/error
+                const error = Phaser.Math.Between(-30, 30);
+                const finalPower = Phaser.Math.Clamp(solution.power + error, this.MIN_POWER, this.MAX_POWER);
+
+                // Animate aiming
+                this.tweens.add({
+                    targets: botTank.barrel,
+                    rotation: solution.angle,
+                    duration: 1000,
+                    ease: 'Power2',
+                    onComplete: () => {
+                        this.time.delayedCall(500, () => {
+                            this.fireProjectile(botTank, solution.angle, finalPower);
+                        });
+                    }
+                });
+            } else {
+                // Fallback if no solution found (shoot randomly left)
+                this.fireProjectile(botTank, Math.PI + 0.5, 600);
+            }
+        });
+    }
+
+    calculateFiringSolution(x0, y0, targetX, targetY) {
+        const dx = targetX - x0;
+        const dy = targetY - y0;
+        const g = 500; // gravity
+
+        // Try a few angles to find a valid power
+        // Bot is on the right, so angles should be around 180-270 degrees (PI to 1.5PI)
+        const testAngles = [
+            Math.PI + 0.35, // Low arc
+            Math.PI + 0.6,  // Mid arc
+            Math.PI + 0.85  // High arc
+        ];
+
+        // Pick a random angle for variety
+        const angle = Phaser.Utils.Array.GetRandom(testAngles);
+
+        // Trajectory formula derived for v
+        // v = sqrt( (g * x^2) / (2 * cos^2(a) * (x * tan(a) - y)) )
+        // Note: My previous derivation had y and x signs handled implicitly by dx/dy
+        // y(x) = x * tan(a) - (g * x^2) / (2 * v^2 * cos^2(a))
+        // So: (g * x^2) / (2 * v^2 * cos^2(a)) = x * tan(a) - y
+        // v^2 = (g * x^2) / (2 * cos^2(a) * (x * tan(a) - y))
+
+        const cosA = Math.cos(angle);
+        const tanA = Math.tan(angle);
+
+        const term = dx * tanA - dy;
+
+        if (term <= 0.001) return null; // No solution for this angle (target too high or wrong direction)
+
+        const v2 = (g * dx * dx) / (2 * cosA * cosA * term);
+        const v = Math.sqrt(v2);
+
+        return { angle: angle, power: v };
+    }
+
     switchTurn() {
         this.time.delayedCall(600, () => {
             if (this.gameOver) return;
@@ -952,6 +1028,12 @@ class GameScene extends Phaser.Scene {
             this.canShoot = true;
             this.updateActiveTank();
             this.updateTurnIndicator();
+
+            // Bot Turn Check
+            if (this.currentPlayerIndex === 1) {
+                this.canShoot = false;
+                this.botTurn();
+            }
         });
     }
 

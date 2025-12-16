@@ -1,0 +1,190 @@
+
+# 🌱 MAP & BACKGROUND PROPOSAL
+
+### *World War Tanks* — Flat Grass & Blue Sky
+
+---
+
+## 🎯 Core Design Philosophy
+
+* **Maximum clarity**
+* **Zero distractions**
+* **Physics-first gameplay**
+* Inspired by **Flappy Bird simplicity**, but **no obstacles**
+
+---
+
+## 1️⃣ Overall Map Layout
+
+```
+ ┌───────────────────────────────┐
+ │           BLUE SKY            │
+ │                               │
+ │      PROJECTILE SPACE         │
+ │                               │
+ │                               │
+ ├──────────── GRASS ────────────┤
+```
+
+### Key Characteristics:
+
+* Fixed screen
+* No camera movement
+* One flat ground
+* Large open air space
+
+---
+
+## 2️⃣ Background Design
+
+### Sky
+
+* Solid **light blue** or gentle vertical gradient
+* No clouds
+* No parallax
+* No animations
+
+Purpose:
+
+* Keep projectile arcs extremely visible
+* Avoid visual noise
+
+---
+
+## 3️⃣ Ground Design (Grass)
+
+### Shape:
+
+* **Perfectly flat horizontal strip**
+* Full screen width
+
+### Visual Style:
+
+* Simple green rectangle
+* Thin darker green strip on top to suggest grass
+* No texture needed
+
+---
+
+## 4️⃣ Ground Physics
+
+* Static physics body
+* Full-width collision
+* No destructible terrain (for now)
+
+Purpose:
+
+* Stable tank placement
+* Predictable bounces and impacts
+
+---
+
+## 5️⃣ Tank Placement
+
+### Rules:
+
+* Tanks sit directly on grass
+* Player 1: left side
+* Player 2: right side
+* Same vertical height
+
+This ensures:
+
+* Fair gameplay
+* Easy aiming
+* Clear line of sight
+
+---
+
+## 6️⃣ World Boundaries
+
+### Left & Right:
+
+* Invisible walls
+* Projectiles destroyed if exiting
+
+### Top:
+
+* Invisible ceiling OR projectile timeout
+
+### Bottom:
+
+* Grass ground (visible & collidable)
+
+---
+
+## 7️⃣ Camera Behavior
+
+* Fixed camera
+* No zoom
+* No shake (optional small shake on explosion only)
+
+---
+
+## 8️⃣ Color & Contrast Rules
+
+| Element     | Color              |
+| ----------- | ------------------ |
+| Sky         | Light blue         |
+| Grass       | Medium green       |
+| Tanks       | Dark green / brown |
+| Projectiles | Dark gray / black  |
+
+Ensures:
+
+* High readability
+* Accessibility
+
+---
+
+## 9️⃣ Performance Considerations
+
+* Draw background using simple rectangles
+* No images required
+* One physics body for ground
+
+Perfect for:
+
+* Web
+* Mobile browsers
+* Low-end devices
+
+---
+
+## 🔟 Future Expansion (Optional)
+
+Later you may add:
+
+* Slight hills
+* Wind effects
+* Day/night sky colors
+* Destructible ground
+
+⚠️ Not now.
+
+---
+
+## 11️⃣ Success Criteria
+
+This map is successful when:
+
+✅ Shots are easy to track
+✅ Tanks are always visible
+✅ No visual clutter
+✅ Physics feels fair
+✅ Loads instantly
+
+---
+
+## 🏁 FINAL SUMMARY
+
+This flat grass + blue sky map:
+
+* Is the **best starting map**
+* Supports your shooting mechanics perfectly
+* Matches Flappy Bird’s clarity without copying it
+* Keeps development fast and clean
+
+> 🎯 **Simple ground. Open sky. Pure skill.**
+
+---

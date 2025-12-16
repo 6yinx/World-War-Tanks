@@ -1,0 +1,22 @@
+{
+  "name": "world-war-tanks",
+  "version": "1.0.0",
+  "description": "A turn-based tank battle game with physics-based projectile combat",
+  "main": "index.html",
+  "scripts": {
+    "dev": "npx serve .",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "game",
+    "phaser",
+    "tank",
+    "html5",
+    "javascript"
+  ],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

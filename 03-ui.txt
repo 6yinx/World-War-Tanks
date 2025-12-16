@@ -1,0 +1,174 @@
+
+---
+
+# 🧩 SIMPLE UI + START SCREEN FUNCTIONALITY PROPOSAL
+
+### *World War Tanks* — Minimal & Functional
+
+---
+
+## 🎯 Goals of This Phase
+
+* Add a **Start Screen** before gameplay
+* Keep UI **minimal and fast**
+* Avoid slowing down gameplay access
+* Prepare structure for future expansion
+
+---
+
+## 1️⃣ Scene Flow Overview
+
+```
+StartScene  →  GameScene
+                 ↑
+              Restart
+```
+
+* No menus, no settings screens
+* Only one transition before gameplay
+
+---
+
+## 2️⃣ Start Screen (StartScene)
+
+### Purpose
+
+* Give players a clear entry point
+* Show game title
+* Let players start immediately
+
+---
+
+### Start Screen Elements
+
+#### 🪖 Game Title
+
+* Text: **“World War Tanks”**
+* Large, centered
+* Simple font
+* Optional subtle animation (slow fade-in)
+
+---
+
+#### ▶️ Start Button
+
+* Text: **“Start Battle”**
+* Centered under title
+* Large clickable area
+
+**Functionality:**
+
+* On click:
+
+  * Transition to `GameScene`
+  * Initialize game state
+  * Set Player 1 as starting player
+
+---
+
+#### 🧠 Controls Hint (Optional)
+
+Small text at bottom:
+
+> “Click and drag to aim. Release to fire.”
+
+Purpose:
+
+* Reduce confusion
+* No tutorial screen needed
+
+---
+
+## 3️⃣ Start Screen Design Rules
+
+* Static background (battlefield silhouette)
+* No physics
+* No sound required
+* Screen is skippable (click anywhere = start)
+
+---
+
+## 4️⃣ Game Scene UI (Recap)
+
+### Included UI Elements:
+
+* Turn Indicator (top center)
+* Health bars (near tanks)
+* Restart button (top right)
+* Optional power indicator (during aim)
+
+All UI appears **only after game starts**.
+
+---
+
+## 5️⃣ Restart Behavior (Updated)
+
+### Restart Button:
+
+* Resets game
+* Stays in `GameScene`
+
+### Optional Restart-to-Start:
+
+* Long press or double-click:
+
+  * Return to `StartScene`
+
+(Not required for MVP)
+
+---
+
+## 6️⃣ Win State UI (Minimal)
+
+* Show text:
+
+  * “Player X Wins!”
+* Disable input
+* Auto-reset after delay OR wait for restart click
+
+No victory menu.
+
+---
+
+## 7️⃣ Technical Implementation Notes (Phaser)
+
+### Scene Separation:
+
+* `StartScene`
+
+  * Title text
+  * Start button
+* `GameScene`
+
+  * Gameplay
+  * UI overlay
+
+### Input Handling:
+
+* StartScene captures all input
+* GameScene input locked by turn manager
+
+---
+
+## 8️⃣ Success Criteria
+
+This phase is successful when:
+
+✅ Player sees a start screen
+✅ Player can start game in one click
+✅ Gameplay begins immediately
+✅ UI is clear but minimal
+✅ No UI blocks gameplay
+
+---
+
+## 🏁 FINAL SUMMARY
+
+This structure gives you:
+
+* A clean game entry point
+* Minimal but useful UI
+* A scalable scene flow
+* No wasted development effort
+
+> 🎯 **One button. One game. Zero friction.**

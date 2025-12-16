@@ -1,0 +1,217 @@
+
+# 🪖 TANK VISUAL DESIGN PROPOSAL
+
+### *World War Tanks* — 2D Simple Style
+
+---
+
+## 🎯 Design Goals
+
+* Instantly readable at a glance
+* Clear aiming direction
+* Works well with physics gameplay
+* Easy to create and animate
+* Low performance cost for web
+
+---
+
+## 1️⃣ Overall Tank Style
+
+### Visual Style:
+
+* **Flat 2D**
+* **Low-detail**
+* **Slightly cartoon-military**
+* No realistic textures
+
+### Perspective:
+
+* **Side view (2D profile)**
+* Barrel rotates in an arc
+* Body remains static
+
+---
+
+## 2️⃣ Tank Size & Proportions
+
+| Part   | Proportion |
+| ------ | ---------- |
+| Body   | 70% width  |
+| Turret | 20% width  |
+| Barrel | 10% width  |
+
+### Suggested Sprite Size:
+
+* **Tank body:** ~80×40 px
+* **Barrel:** ~35×6 px
+
+These sizes scale well across browsers.
+
+---
+
+## 3️⃣ Tank Components (Separated Sprites)
+
+### 🧱 Tank Body
+
+* Rectangular base
+* Slight rounded corners
+* Simple tread detail (just lines or circles)
+
+**Color:**
+
+* Player 1: Olive green
+* Player 2: Desert brown / gray
+
+---
+
+### 🔄 Turret
+
+* Circular or half-circle shape
+* Centered on tank body
+* Acts as rotation pivot
+
+Purpose:
+
+* Visually indicates aiming direction
+
+---
+
+### ➖ Barrel
+
+* Thin rectangle
+* Rotates independently
+* Clear tip to show firing direction
+
+Rules:
+
+* Always visible
+* Never blends into background
+
+---
+
+## 4️⃣ Color & Contrast Rules
+
+* High contrast between tanks and background
+* No camouflage patterns
+* Avoid background colors close to tank colors
+
+This ensures:
+
+* Easy aiming
+* Easy hit detection
+* Better mobile visibility
+
+---
+
+## 5️⃣ Damage Visual Feedback
+
+### On Hit:
+
+* Tank briefly flashes white or red
+* Small smoke puff near impact
+* No complex damage decals
+
+### On Low Health:
+
+* Light smoke animation from body
+* Barrel slightly shakes (optional)
+
+---
+
+## 6️⃣ Active Tank Indicator (Non-UI)
+
+Instead of UI:
+
+* Active tank has:
+
+  * Slight glow outline
+  * Brighter color tint
+* Inactive tank slightly dimmed
+
+Purpose:
+
+* Communicates turn clearly
+* No text needed
+
+---
+
+## 7️⃣ Destroyed Tank State
+
+### Visuals:
+
+* Body breaks into 2–3 pieces OR
+* Body darkens and sinks slightly
+* Larger explosion sprite
+
+### Rules:
+
+* Destroyed tank no longer responds
+* Health bar hidden
+* Collision disabled
+
+---
+
+## 8️⃣ Animation Requirements (Minimal)
+
+| Animation       | Required    |
+| --------------- | ----------- |
+| Barrel rotation | YES         |
+| Firing recoil   | YES (small) |
+| Explosion       | YES         |
+| Idle movement   | NO          |
+
+Keep animations short and subtle.
+
+---
+
+## 9️⃣ Asset Creation Guidelines
+
+### Tools:
+
+* Aseprite
+* Piskel
+* Photoshop / GIMP
+* Or vector shapes drawn directly in Phaser
+
+### File Format:
+
+* PNG with transparency
+* No sprite sheets needed for MVP
+
+---
+
+## 🔟 Variations (Future-Ready)
+
+Without changing gameplay:
+
+* Different barrel lengths
+* Slight body shape changes
+* Color swaps only
+
+No size differences (for fairness).
+
+---
+
+## 11️⃣ Success Criteria
+
+Tank design is successful when:
+
+✅ Aiming direction is obvious
+✅ Active tank is instantly clear
+✅ Tanks are readable on small screens
+✅ No visual clutter
+✅ Easy to animate & code
+
+---
+
+## 🏁 FINAL SUMMARY
+
+This tank design:
+
+* Supports physics-based shooting
+* Keeps visuals clean and readable
+* Works perfectly for a 2D web game
+* Scales well for future features
+
+> 🎯 **Readable tanks = better gameplay.**
+

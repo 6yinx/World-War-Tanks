@@ -1,0 +1,135 @@
+
+---
+
+# **Intro Functionality Proposal**
+
+### Game Title: *World War Tanks*
+
+## 1. Purpose of the Intro
+
+The intro sets the tone of the game, explains the conflict quickly, and transitions the player smoothly into gameplay without long tutorials or text overload.
+
+---
+
+## 2. Intro Flow Overview
+
+**Total duration:** ~10–15 seconds (skippable)
+
+**Flow:**
+
+1. Studio / Game Logo
+2. Story Setup
+3. Visual Tank Conflict
+4. Call-to-Action (Start Game)
+
+---
+
+## 3. Intro Screens & Functionality
+
+### 3.1 Logo Screen
+
+**Functionality:**
+
+* Display game logo: *World War Tanks*
+* Simple fade-in animation
+* Background: static battlefield silhouette
+* Soft mechanical sound or engine hum
+
+**Player Action:**
+
+* Click anywhere to skip
+
+---
+
+### 3.2 Story Setup Screen
+
+**Functionality:**
+
+* Short text appears with typewriter or fade effect:
+
+> “In a world where gravity is unstable, tanks no longer roll…
+> They fly.
+> And they fight for dominance.”
+
+* Background slowly pans (parallax effect)
+
+**Purpose:**
+
+* Establish lore without long explanation
+* Prepare player for antigravity mechanics
+
+---
+
+### 3.3 Conflict Visual Screen
+
+**Functionality:**
+
+* Two tanks appear on opposite sides
+* One tank fires a shell in a curved arc
+* Explosion animation on impact
+* Screen shake (light)
+
+**Purpose:**
+
+* Visually teach:
+
+  * Projectile arcs
+  * Turn-based combat idea
+* No UI yet — pure visual storytelling
+
+---
+
+### 3.4 Start Game Screen
+
+**Functionality:**
+
+* Buttons:
+
+  * **Start Battle**
+  * **Controls** (optional)
+  * **Mute Sound**
+* Subtle tank idle animation
+* Background music loop starts here
+
+**Player Action:**
+
+* Click **Start Battle** → Load Level 1
+
+---
+
+## 4. User Controls
+
+* **Mouse / Touch:**
+
+  * Click anywhere to skip intro
+  * Button-based navigation on final screen
+
+---
+
+## 5. Technical Considerations (Phaser)
+
+* Intro implemented as a **Phaser Scene**
+* Assets preloaded before intro starts
+* Intro scenes chained using timers or scene transitions
+* Skip functionality available at all times
+
+---
+
+## 6. Success Criteria
+
+* Player understands:
+
+  * Tanks shoot projectiles
+  * Physics-based gameplay
+* No confusion before gameplay
+* Fast transition to action
+
+---
+
+## 7. Future Expansion (Optional)
+
+* Animated comic panels
+* Dynamic text based on difficulty
+* Multiplayer intro variations
+
+---

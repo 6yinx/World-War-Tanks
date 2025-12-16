@@ -1,0 +1,281 @@
+
+---
+
+# 🎮 CORE GAME FUNCTIONALITY PROPOSAL
+
+### *World War Tanks* — Playable Prototype (No UI)
+
+## 🎯 Goal of This Phase
+
+Create a **fully playable game loop** where:
+
+* Two tanks can shoot each other
+* Physics determines projectile paths
+* Turns alternate correctly
+* A winner can be determined
+
+⚠️ **No menus, no buttons, no HUD, no intro UI**
+Only gameplay systems.
+
+---
+
+## 1️⃣ Core Game Loop (MVP)
+
+**Loop Definition:**
+
+1. Player Tank A aims
+2. Player Tank A shoots
+3. Projectile resolves (hit or miss)
+4. Damage applied
+5. Turn switches to Tank B
+6. Repeat until one tank is destroyed
+
+This loop must work **100% reliably** before anything else is added.
+
+---
+
+## 2️⃣ Game Scene (Single Scene Only)
+
+### Scene Name:
+
+`GameScene`
+
+### Responsibilities:
+
+* Spawn tanks
+* Handle input
+* Handle physics
+* Handle turns
+* Detect win condition
+* Restart game automatically
+
+---
+
+## 3️⃣ Tank Functionality
+
+### Tank Properties:
+
+* Position (x, y)
+* Rotation (aim angle)
+* Health (numeric)
+* Active state (can act / locked)
+* Sprite + physics body
+
+### Tank Rules:
+
+* Tanks do NOT move
+* Tanks can only:
+
+  * Aim
+  * Shoot
+* Only **one tank is active at a time**
+
+---
+
+## 4️⃣ Input & Aiming System (NO UI)
+
+### Input Method:
+
+**Mouse / Touch Drag**
+
+### Functionality:
+
+1. Click on active tank
+2. Drag backwards from barrel
+3. Calculate:
+
+   * Angle
+   * Power
+4. Draw:
+
+   * Temporary aiming line (debug line only)
+5. Release to fire
+
+⚠️ Aiming line is **debug-only**, not UI.
+
+---
+
+## 5️⃣ Shooting System (CRITICAL)
+
+### Projectile Creation:
+
+* Spawn at tank barrel
+* Physics-enabled sprite
+* Initial velocity based on drag distance
+
+### Physics:
+
+* Gravity enabled
+* Air resistance optional (later)
+* Collides with:
+
+  * Ground
+  * Tanks
+
+### Rules:
+
+* Only **one projectile at a time**
+* Lock player input while projectile exists
+
+---
+
+## 6️⃣ Ground & Environment
+
+### Ground:
+
+* Static physics body
+* Simple rectangle or terrain shape
+* No destructible terrain (yet)
+
+Purpose:
+
+* Give projectiles something to hit
+* Establish arc behavior
+
+---
+
+## 7️⃣ Collision & Damage System
+
+### On Projectile Impact:
+
+* Destroy projectile
+* Trigger explosion logic
+* Calculate damage
+
+### Damage Rules:
+
+* Direct hit → high damage
+* Near hit → reduced damage
+* Miss → no damage
+
+Health reduces numerically (no UI display yet).
+
+---
+
+## 8️⃣ Explosion System (Visual Only)
+
+### Explosion Behavior:
+
+* Simple sprite animation
+* Short duration
+* Optional screen shake
+
+Purpose:
+
+* Visual feedback for hits
+* Communicate power & impact
+
+---
+
+## 9️⃣ Turn Management System
+
+### Rules:
+
+* Game starts with Player A
+* After projectile resolves:
+
+  * Switch active tank
+  * Enable input for next player
+
+### Safety:
+
+* Prevent double firing
+* Prevent firing during projectile flight
+
+---
+
+## 🔁 10️⃣ Game Reset Logic
+
+### Win Condition:
+
+* Tank health ≤ 0
+
+### On Win:
+
+* Pause briefly (1–2 seconds)
+* Reset:
+
+  * Tank positions
+  * Health
+  * Turn order
+
+⚠️ No victory UI — auto-reset only.
+
+---
+
+## 11️⃣ Debug Feedback (TEMPORARY)
+
+Instead of UI, use:
+
+* Console logs:
+
+  * Current player
+  * Damage dealt
+* Debug lines:
+
+  * Aim direction
+* Tint active tank sprite
+
+These will be removed later.
+
+---
+
+## 12️⃣ Technical Constraints
+
+### Performance:
+
+* Target 60 FPS
+* Single scene
+* Minimal assets
+
+### Simplicity Rules:
+
+* No sound required (optional)
+* No menus
+* No UI elements
+* No asset polish
+
+---
+
+## 13️⃣ Success Criteria (VERY IMPORTANT)
+
+The prototype is considered **SUCCESSFUL** when:
+
+✅ Two players can take turns
+✅ Shots follow realistic arcs
+✅ Tanks can be destroyed
+✅ Game loops endlessly
+✅ No crashes or stuck turns
+
+Only after ALL are true → UI phase begins.
+
+---
+
+## 14️⃣ What Comes AFTER This Phase (Not Now)
+
+Later additions:
+
+* Health bars
+* Power meter
+* Wind
+* Terrain destruction
+* Menu & intro
+* Mobile controls
+
+❌ **Do NOT add these now**
+
+---
+
+# 🏁 FINAL SUMMARY
+
+This proposal ensures:
+
+* Fast playable prototype
+* Strong physics foundation
+* Clean system separation
+* Zero wasted effort on UI
+
+> 🎯 **Make it playable first. Make it pretty later.**
+
+---
+

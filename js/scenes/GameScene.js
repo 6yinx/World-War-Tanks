@@ -190,52 +190,53 @@ class GameScene extends Phaser.Scene {
     // ENVIRONMENT (Phase 1 + Polish)
     // ==========================================
     createEnvironment() {
+        const width = this.scale.width;
+        const height = this.scale.height;
+
         // Beautiful sky gradient
         const skyGradient = this.add.graphics();
         skyGradient.fillGradientStyle(0x4A90D9, 0x4A90D9, 0x87CEEB, 0x87CEEB);
-        skyGradient.fillRect(0, 0, 1280, 640);
+        skyGradient.fillRect(0, 0, width, height - 80);
 
         // Sun
-        const sun = this.add.circle(1100, 80, 50, 0xFFDD44, 0.9);
-        this.add.circle(1100, 80, 45, 0xFFFF88, 0.5);
+        const sun = this.add.circle(width - 180, 80, 50, 0xFFDD44, 0.9);
+        this.add.circle(width - 180, 80, 45, 0xFFFF88, 0.5);
 
         // Clouds
         this.createCloud(150, 80);
         this.createCloud(400, 120);
-        this.createCloud(700, 60);
-        this.createCloud(950, 140);
+        this.createCloud(width - 580, 60);
+        this.createCloud(width - 330, 140);
 
         // Distant hills
         const hills = this.add.graphics();
         hills.fillStyle(0x6B8E23, 0.5);
         hills.beginPath();
-        hills.moveTo(0, 640);
-        hills.lineTo(200, 580);
-        hills.lineTo(400, 610);
-        hills.lineTo(600, 560);
-        hills.lineTo(800, 600);
-        hills.lineTo(1000, 550);
-        hills.lineTo(1280, 590);
-        hills.lineTo(1280, 640);
+        hills.moveTo(0, height - 80);
+        // Dynamic hills drawn across the width
+        for (let i = 0; i <= width; i += 200) {
+            hills.lineTo(i, height - 80 - Math.random() * 80);
+        }
+        hills.lineTo(width, height - 80);
         hills.closePath();
         hills.fillPath();
 
         // Ground (grass) with texture
         const groundGradient = this.add.graphics();
         groundGradient.fillGradientStyle(0x4a7c23, 0x4a7c23, 0x3d6b1c, 0x3d6b1c);
-        groundGradient.fillRect(0, 640, 1280, 80);
+        groundGradient.fillRect(0, height - 80, width, 80);
 
         // Grass line
-        this.add.rectangle(640, 642, 1280, 4, 0x5d9c2f);
+        this.add.rectangle(width / 2, height - 78, width, 4, 0x5d9c2f);
 
         // Physics ground
-        this.ground = this.add.rectangle(640, 680, 1280, 80, 0x000000, 0);
+        this.ground = this.add.rectangle(width / 2, height - 40, width, 80, 0x000000, 0);
         this.physics.add.existing(this.ground, true);
 
         // World bounds
-        this.leftWall = this.add.rectangle(-10, 360, 20, 720, 0x000000, 0);
+        this.leftWall = this.add.rectangle(-10, height / 2, 20, height, 0x000000, 0);
         this.physics.add.existing(this.leftWall, true);
-        this.rightWall = this.add.rectangle(1290, 360, 20, 720, 0x000000, 0);
+        this.rightWall = this.add.rectangle(width + 10, height / 2, 20, height, 0x000000, 0);
         this.physics.add.existing(this.rightWall, true);
     }
 
@@ -252,8 +253,9 @@ class GameScene extends Phaser.Scene {
     // TANKS (Phase 1 + Phase 4 Art)
     // ==========================================
     createTanks() {
-        const tankA = this.createTank(200, 605, 0x4A6741, 0x5C7D52, 'Player 1', true);
-        const tankB = this.createTank(1080, 605, 0x8B6914, 0xA67C00, 'Bot', false);
+        const groundY = this.scale.height - 115;
+        const tankA = this.createTank(200, groundY, 0x4A6741, 0x5C7D52, 'Player 1', true);
+        const tankB = this.createTank(this.scale.width - 200, groundY, 0x8B6914, 0xA67C00, 'Bot', false);
 
         this.tanks = [tankA, tankB];
     }
@@ -379,38 +381,41 @@ class GameScene extends Phaser.Scene {
     // UI (Phase 3)
     // ==========================================
     createUI() {
+        const width = this.scale.width;
+        const centerX = width / 2;
+
         // Top UI bar background
         const uiBar = this.add.graphics();
         uiBar.fillStyle(0x000000, 0.6);
-        uiBar.fillRoundedRect(440, 10, 400, 50, 10);
+        uiBar.fillRoundedRect(centerX - 200, 10, 400, 50, 10);
         uiBar.setDepth(200);
 
         // Turn indicator
-        this.turnIndicator = this.add.text(640, 25, '', {
+        this.turnIndicator = this.add.text(centerX, 25, '', {
             fontSize: '20px',
             fontFamily: 'Arial Black, sans-serif',
             color: '#ffffff'
         }).setOrigin(0.5).setDepth(201);
 
         // Turn indicator subtitle
-        this.turnSubtext = this.add.text(640, 48, 'Click & Drag near tank to aim', {
+        this.turnSubtext = this.add.text(centerX, 48, 'Click & Drag near tank to aim', {
             fontSize: '12px',
             fontFamily: 'Arial',
             color: '#aaaaaa'
         }).setOrigin(0.5).setDepth(201);
 
         // Power indicator (shown during aiming)
-        this.powerIndicatorBg = this.add.rectangle(640, 75, 200, 16, 0x333333);
+        this.powerIndicatorBg = this.add.rectangle(centerX, 75, 200, 16, 0x333333);
         this.powerIndicatorBg.setStrokeStyle(2, 0x000000);
         this.powerIndicatorBg.setDepth(200);
         this.powerIndicatorBg.setAlpha(0);
 
-        this.powerIndicatorFill = this.add.rectangle(542, 75, 0, 12, 0xFF6600);
+        this.powerIndicatorFill = this.add.rectangle(centerX - 98, 75, 0, 12, 0xFF6600);
         this.powerIndicatorFill.setOrigin(0, 0.5);
         this.powerIndicatorFill.setDepth(201);
         this.powerIndicatorFill.setAlpha(0);
 
-        this.powerText = this.add.text(640, 75, 'POWER', {
+        this.powerText = this.add.text(centerX, 75, 'POWER', {
             fontSize: '10px',
             fontFamily: 'Arial',
             fontStyle: 'bold',
@@ -419,7 +424,7 @@ class GameScene extends Phaser.Scene {
         this.powerText.setAlpha(0);
 
         // Restart button
-        this.restartBtn = this.add.container(1220, 40);
+        this.restartBtn = this.add.container(width - 60, 40);
         const restartBg = this.add.rectangle(0, 0, 80, 35, 0x663333);
         restartBg.setStrokeStyle(2, 0x994444);
         restartBg.setInteractive({ useHandCursor: true });
@@ -442,12 +447,15 @@ class GameScene extends Phaser.Scene {
     }
 
     createWinOverlay() {
-        this.winOverlay = this.add.container(640, 360);
+        const width = this.scale.width;
+        const height = this.scale.height;
+
+        this.winOverlay = this.add.container(width / 2, height / 2);
         this.winOverlay.setDepth(500);
         this.winOverlay.setAlpha(0);
 
         // Dark background
-        const bg = this.add.rectangle(0, 0, 1280, 720, 0x000000, 0.7);
+        const bg = this.add.rectangle(0, 0, width, height, 0x000000, 0.7);
 
         // Win panel
         const panel = this.add.graphics();
@@ -1124,8 +1132,10 @@ class GameScene extends Phaser.Scene {
             });
 
             // Out of bounds check
-            if (this.projectile.y > 750 || this.projectile.x < -50 ||
-                this.projectile.x > 1330 || this.projectile.y < -300) {
+            const width = this.scale.width;
+            const height = this.scale.height;
+            if (this.projectile.y > height + 50 || this.projectile.x < -50 ||
+                this.projectile.x > width + 50 || this.projectile.y < -300) {
                 this.destroyProjectile();
                 this.switchTurn();
             }

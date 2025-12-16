@@ -1,4 +1,4 @@
-/**
+/*
  * World War Tanks - Main Game Configuration
  * 
  * Phase 0: Project Setup (Foundation)
@@ -16,21 +16,10 @@
 
 const config = {
     type: Phaser.AUTO,
-    width: 1280,
-    height: 720,
-    parent: 'game-container',
-    backgroundColor: '#1a1a2e', // Dark background for intro
-    physics: {
-        default: 'arcade',
-        arcade: {
-            gravity: { y: 500 }, // Y-axis gravity for projectile arcs
-            debug: false // Disabled for cleaner visuals
-        }
-    },
-    scene: [IntroScene, GameScene], // IntroScene starts first
     scale: {
-        mode: Phaser.Scale.FIT,
-        autoCenter: Phaser.Scale.CENTER_BOTH
+        mode: Phaser.Scale.RESIZE,
+        width: '100%',
+        height: '100%'
     }
 };
 

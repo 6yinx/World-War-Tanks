@@ -30,12 +30,12 @@ window.GameScene = class GameScene extends Phaser.Scene {
         this.aimLerpSpeed = 0.15; // Smoothing factor
 
         // Constants - Increased max power for longer shots
-        this.TANK_HEALTH = 100;
+        this.TANK_HEALTH = 1000;
         this.MAX_POWER = 1200;  // Increased from 800
         this.MIN_POWER = 150;   // Increased minimum too
         this.POWER_MULTIPLIER = 4; // Higher multiplier for distance
-        this.DIRECT_HIT_DAMAGE = 50;
-        this.NEAR_HIT_DAMAGE = 40;
+        this.DIRECT_HIT_DAMAGE = 150;
+        this.NEAR_HIT_DAMAGE = 120;
         this.NEAR_HIT_RADIUS = 200;
 
         // Tank movement constants
@@ -43,17 +43,23 @@ window.GameScene = class GameScene extends Phaser.Scene {
         this.TANK_MIN_X = 80;
         this.TANK_MAX_X = 600; // Player tank can only move in left half
 
-        // Crater tracking
-        this.craters = [];
+        // Charge-up bar shooting variables
+        this.groundSegments = [];    // Array to hold ground physics segments
+        this.SEGMENT_WIDTH = 20;     // Width of each ground segment
+        this.isTimingActive = false;    // Is the timing bar visible?
+        this.isCharging = false;        // Is player holding SPACE to charge?
+        this.chargeLevel = 0;           // Current charge level (0-1)
+        this.targetPinPosition = 0.5;   // Random target position (0-1)
+        this.chargeRate = 0.8;          // How fast the bar charges (fills in ~1.25 seconds)
+        this.timingBarWidth = 500;      // Width of the timing bar
+        this.perfectZoneSize = 0.08;    // Size of the perfect zone around target
+        this.currentAimAngle = 0;       // The angle being aimed at
 
         // Initialize audio context for sound effects
         this.initAudio();
     }
 
     create() {
-        // Create crater layer first (below everything)
-        this.craterGraphics = this.add.graphics().setDepth(5);
-
         // Create environment first
         this.createEnvironment();
 
@@ -76,6 +82,10 @@ window.GameScene = class GameScene extends Phaser.Scene {
         this.cursors = this.input.keyboard.createCursorKeys();
         this.keyA = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A);
         this.keyD = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D);
+        this.keySpace = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+
+        // Create timing bar UI (Gunbound-style)
+        this.createTimingBar();
 
         // Update UI
         this.updateActiveTank();
@@ -205,6 +215,9 @@ window.GameScene = class GameScene extends Phaser.Scene {
     // ==========================================
     // ENVIRONMENT (Phase 1 + Polish)
     // ==========================================
+    // ==========================================
+    // ENVIRONMENT (Phase 1 + Polish)
+    // ==========================================
     createEnvironment() {
         const width = this.scale.width;
         const height = this.scale.height;
@@ -240,25 +253,86 @@ window.GameScene = class GameScene extends Phaser.Scene {
         hills.closePath();
         hills.fillPath();
 
-        // Ground (grass) with texture - taller for more bottom space
-        const groundGradient = this.add.graphics();
-        groundGradient.fillGradientStyle(0x4a7c23, 0x4a7c23, 0x3d6b1c, 0x3d6b1c);
-        groundGradient.fillRect(0, this.groundLevel, width, height - this.groundLevel);
-        groundGradient.setDepth(6); // Above craters
+        // Destructible Ground Visuals (Graphics object we will redraw)
+        this.groundGraphicsObj = this.add.graphics();
+        this.groundGraphicsObj.setDepth(6);
 
-        // Grass line at top of ground
-        const grassLine = this.add.rectangle(width / 2, this.groundLevel + 2, width, 4, 0x5d9c2f);
-        grassLine.setDepth(7);
+        // Physics Ground Group
+        this.ground = this.physics.add.staticGroup();
+        this.groundSegments = [];
 
-        // Physics ground - positioned at ground level
-        this.ground = this.add.rectangle(width / 2, this.groundLevel + 40, width, 80, 0x000000, 0);
-        this.physics.add.existing(this.ground, true);
+        // Determine ground color gradient
+        const topColor = Phaser.Display.Color.ValueToColor(0x4a7c23);
+        const bottomColor = Phaser.Display.Color.ValueToColor(0x3d6b1c);
+
+        // Create segments
+        const numSegments = Math.ceil(width / this.SEGMENT_WIDTH);
+
+        for (let i = 0; i < numSegments; i++) {
+            const x = i * this.SEGMENT_WIDTH;
+            const segmentHeight = height - this.groundLevel;
+
+            // Visual data for this segment
+            const segment = {
+                x: x,
+                y: this.groundLevel,
+                width: this.SEGMENT_WIDTH,
+                height: segmentHeight,
+                isActive: true,
+                physicsBody: null,
+                index: i
+            };
+
+            // Create physics body for this segment
+            const body = this.add.rectangle(
+                x + this.SEGMENT_WIDTH / 2,
+                this.groundLevel + segmentHeight / 2,
+                this.SEGMENT_WIDTH,
+                segmentHeight,
+                0x000000, 0
+            );
+            this.ground.add(body);
+            segment.physicsBody = body;
+
+            this.groundSegments.push(segment);
+        }
+
+        // Draw initial ground
+        this.redrawGround();
+
+        // Grass line at top of ground (visual only, will be redrawn)
+        this.grassGraphics = this.add.graphics().setDepth(7);
+        this.redrawGrass();
 
         // World bounds
         this.leftWall = this.add.rectangle(-10, height / 2, 20, height, 0x000000, 0);
         this.physics.add.existing(this.leftWall, true);
         this.rightWall = this.add.rectangle(width + 10, height / 2, 20, height, 0x000000, 0);
         this.physics.add.existing(this.rightWall, true);
+    }
+
+    redrawGround() {
+        this.groundGraphicsObj.clear();
+
+        // Draw each active segment
+        this.groundSegments.forEach(seg => {
+            if (!seg.isActive) return;
+
+            // Simple gradient fill approximation
+            this.groundGraphicsObj.fillGradientStyle(0x4a7c23, 0x4a7c23, 0x3d6b1c, 0x3d6b1c);
+            this.groundGraphicsObj.fillRect(seg.x, seg.y, seg.width, seg.height);
+        });
+    }
+
+    redrawGrass() {
+        this.grassGraphics.clear();
+        this.grassGraphics.fillStyle(0x5d9c2f);
+
+        this.groundSegments.forEach(seg => {
+            if (!seg.isActive) return;
+            // Draw grass on top of active segments
+            this.grassGraphics.fillRect(seg.x, seg.y, seg.width, 4);
+        });
     }
 
     createCloud(x, y) {
@@ -299,43 +373,157 @@ window.GameScene = class GameScene extends Phaser.Scene {
         // Tank container for grouping
         tank.container = this.add.container(x, y);
 
-        // Treads (bottom layer)
+        // ==========================================
+        // IMPROVED TREADS with road wheels
+        // ==========================================
         tank.treads = this.add.graphics();
-        tank.treads.fillStyle(0x222222);
-        tank.treads.fillRoundedRect(-45, 8, 90, 16, 4);
-        // Tread details
-        tank.treads.fillStyle(0x333333);
-        for (let i = -40; i < 40; i += 10) {
-            tank.treads.fillRect(i, 10, 6, 12);
+
+        // Main tread housing (dark metal)
+        tank.treads.fillStyle(0x1a1a1a);
+        tank.treads.fillRoundedRect(-50, 5, 100, 22, 6);
+
+        // Tread surface (rubber texture)
+        tank.treads.fillStyle(0x2a2a2a);
+        tank.treads.fillRoundedRect(-48, 7, 96, 18, 4);
+
+        // Tread pattern (individual track links)
+        tank.treads.fillStyle(0x3a3a3a);
+        for (let i = -44; i < 44; i += 8) {
+            tank.treads.fillRect(i, 8, 5, 16);
+            // Track pins
+            tank.treads.fillStyle(0x4a4a4a);
+            tank.treads.fillCircle(i + 2.5, 12, 2);
+            tank.treads.fillCircle(i + 2.5, 20, 2);
+            tank.treads.fillStyle(0x3a3a3a);
         }
+
+        // Road wheels (5 wheels)
+        for (let i = -36; i <= 36; i += 18) {
+            // Wheel rim
+            tank.treads.fillStyle(0x444444);
+            tank.treads.fillCircle(i, 16, 10);
+            // Wheel hub
+            tank.treads.fillStyle(0x666666);
+            tank.treads.fillCircle(i, 16, 6);
+            // Hub detail
+            tank.treads.fillStyle(0x333333);
+            tank.treads.fillCircle(i, 16, 3);
+            // Wheel spokes
+            tank.treads.lineStyle(1, 0x555555);
+            for (let a = 0; a < 6; a++) {
+                const angle = a * (Math.PI / 3);
+                tank.treads.beginPath();
+                tank.treads.moveTo(i, 16);
+                tank.treads.lineTo(i + Math.cos(angle) * 8, 16 + Math.sin(angle) * 8);
+                tank.treads.strokePath();
+            }
+        }
+
+        // Drive sprocket (front) and idler wheel (back)
+        const sprocketPos = facingRight ? 42 : -42;
+        const idlerPos = facingRight ? -42 : 42;
+        tank.treads.fillStyle(0x555555);
+        tank.treads.fillCircle(sprocketPos, 14, 8);
+        tank.treads.fillStyle(0x666666);
+        tank.treads.fillCircle(idlerPos, 14, 7);
+
         tank.container.add(tank.treads);
 
-        // Tank body with gradient effect
+        // ==========================================
+        // IMPROVED TANK BODY with armor details
+        // ==========================================
         tank.bodyGraphics = this.add.graphics();
-        this.drawTankBody(tank.bodyGraphics, bodyColor, highlightColor);
+        this.drawTankBody(tank.bodyGraphics, bodyColor, highlightColor, facingRight);
         tank.container.add(tank.bodyGraphics);
 
-        // Turret base
+        // ==========================================
+        // TURRET with commander's hatch
+        // ==========================================
         tank.turretBase = this.add.graphics();
+
+        // Turret shadow
+        tank.turretBase.fillStyle(0x000000, 0.3);
+        tank.turretBase.fillEllipse(2, -12, 40, 12);
+
+        // Main turret body
         tank.turretBase.fillStyle(bodyColor);
+        tank.turretBase.fillCircle(0, -15, 20);
+
+        // Turret armor ring
+        const darkerColor = Phaser.Display.Color.ValueToColor(bodyColor).darken(20).color;
+        tank.turretBase.fillStyle(darkerColor);
         tank.turretBase.fillCircle(0, -15, 18);
+        tank.turretBase.fillStyle(bodyColor);
+        tank.turretBase.fillCircle(0, -15, 15);
+
+        // Turret outline
         tank.turretBase.lineStyle(2, 0x000000);
-        tank.turretBase.strokeCircle(0, -15, 18);
+        tank.turretBase.strokeCircle(0, -15, 20);
+
+        // Commander's hatch
+        tank.turretBase.fillStyle(highlightColor);
+        tank.turretBase.fillCircle(-8, -20, 8);
+        tank.turretBase.lineStyle(2, 0x000000);
+        tank.turretBase.strokeCircle(-8, -20, 8);
+
+        // Hatch handle
+        tank.turretBase.lineStyle(2, 0x333333);
+        tank.turretBase.beginPath();
+        tank.turretBase.moveTo(-12, -20);
+        tank.turretBase.lineTo(-4, -20);
+        tank.turretBase.strokePath();
+
+        // Antenna
+        tank.turretBase.lineStyle(2, 0x444444);
+        tank.turretBase.beginPath();
+        tank.turretBase.moveTo(12, -22);
+        tank.turretBase.lineTo(12, -45);
+        tank.turretBase.strokePath();
+        tank.turretBase.fillStyle(0xff4444);
+        tank.turretBase.fillCircle(12, -46, 3);
+
         tank.container.add(tank.turretBase);
 
-        // Turret top (lighter)
-        tank.turretTop = this.add.circle(0, -18, 10, highlightColor);
+        // Turret top view port
+        tank.turretTop = this.add.circle(5, -18, 6, highlightColor);
         tank.turretTop.setStrokeStyle(1, 0x000000);
         tank.container.add(tank.turretTop);
 
-        // Barrel (separate from container for rotation)
+        // ==========================================
+        // IMPROVED BARREL with muzzle brake
+        // ==========================================
         tank.barrel = this.add.graphics();
+
+        // Main barrel body
+        tank.barrel.fillStyle(0x3a3a3a);
+        tank.barrel.fillRoundedRect(0, -5, 55, 10, 2);
+
+        // Barrel taper
         tank.barrel.fillStyle(0x444444);
-        tank.barrel.fillRoundedRect(0, -4, 45, 8, 2);
-        tank.barrel.fillStyle(0x333333);
-        tank.barrel.fillRect(40, -5, 8, 10);
+        tank.barrel.fillRect(0, -4, 20, 8);
+
+        // Barrel rifling detail
+        tank.barrel.lineStyle(1, 0x333333);
+        tank.barrel.beginPath();
+        tank.barrel.moveTo(5, 0);
+        tank.barrel.lineTo(50, 0);
+        tank.barrel.strokePath();
+
+        // Muzzle brake
+        tank.barrel.fillStyle(0x2a2a2a);
+        tank.barrel.fillRect(50, -7, 12, 14);
+        tank.barrel.fillStyle(0x222222);
+        tank.barrel.fillRect(53, -8, 3, 16);
+        tank.barrel.fillRect(58, -8, 3, 16);
+
+        // Muzzle opening
+        tank.barrel.fillStyle(0x111111);
+        tank.barrel.fillCircle(62, 0, 4);
+
+        // Barrel outline
         tank.barrel.lineStyle(1, 0x222222);
-        tank.barrel.strokeRoundedRect(0, -4, 45, 8, 2);
+        tank.barrel.strokeRoundedRect(0, -5, 55, 10, 2);
+
         tank.barrel.x = x;
         tank.barrel.y = y - 20;
         tank.barrel.setDepth(10);
@@ -344,17 +532,17 @@ window.GameScene = class GameScene extends Phaser.Scene {
         tank.barrel.rotation = facingRight ? -0.5 : Math.PI + 0.5;
 
         // Health bar background
-        tank.healthBarBg = this.add.rectangle(x, y - 55, 70, 12, 0x333333);
+        tank.healthBarBg = this.add.rectangle(x, y - 60, 80, 14, 0x222222);
         tank.healthBarBg.setStrokeStyle(2, 0x000000);
         tank.healthBarBg.setDepth(100);
 
         // Health bar fill
-        tank.healthBarFill = this.add.rectangle(x - 32, y - 55, 64, 8, 0x00FF00);
+        tank.healthBarFill = this.add.rectangle(x - 37, y - 60, 74, 10, 0x00FF00);
         tank.healthBarFill.setOrigin(0, 0.5);
         tank.healthBarFill.setDepth(101);
 
         // Health text
-        tank.healthText = this.add.text(x, y - 55, '100', {
+        tank.healthText = this.add.text(x, y - 60, this.TANK_HEALTH.toString(), {
             fontSize: '10px',
             fontFamily: 'Arial',
             fontStyle: 'bold',
@@ -362,7 +550,7 @@ window.GameScene = class GameScene extends Phaser.Scene {
         }).setOrigin(0.5).setDepth(102);
 
         // Name label
-        tank.nameLabel = this.add.text(x, y - 75, name, {
+        tank.nameLabel = this.add.text(x, y - 80, name, {
             fontSize: '14px',
             fontFamily: 'Arial',
             fontStyle: 'bold',
@@ -372,31 +560,84 @@ window.GameScene = class GameScene extends Phaser.Scene {
         }).setOrigin(0.5).setDepth(100);
 
         // Physics body (invisible, for collision)
-        tank.physicsBody = this.add.rectangle(x, y, 80, 35, 0x000000, 0);
-        this.physics.add.existing(tank.physicsBody, true);
+        tank.physicsBody = this.add.rectangle(x, y, 90, 40, 0x000000, 0);
+        this.physics.add.existing(tank.physicsBody); // Dynamic body
+        tank.physicsBody.body.setCollideWorldBounds(true);
+        tank.physicsBody.body.setGravityY(600);
+
+        // Add collision with ground
+        this.physics.add.collider(tank.physicsBody, this.ground);
 
         return tank;
     }
 
-    drawTankBody(graphics, mainColor, lightColor) {
+    drawTankBody(graphics, mainColor, lightColor, facingRight = true) {
         graphics.clear();
 
-        // Main body
-        graphics.fillStyle(mainColor);
-        graphics.fillRoundedRect(-40, -10, 80, 30, 5);
+        // Tank body shadow
+        graphics.fillStyle(0x000000, 0.3);
+        graphics.fillRoundedRect(-38, -6, 80, 30, 5);
 
-        // Top highlight
+        // Main body hull
+        graphics.fillStyle(mainColor);
+        graphics.fillRoundedRect(-45, -12, 90, 32, 6);
+
+        // Top armor plate (sloped)
         graphics.fillStyle(lightColor);
-        graphics.fillRoundedRect(-38, -8, 76, 12, 3);
+        graphics.beginPath();
+        graphics.moveTo(-42, -10);
+        graphics.lineTo(42, -10);
+        graphics.lineTo(38, 0);
+        graphics.lineTo(-38, 0);
+        graphics.closePath();
+        graphics.fillPath();
 
-        // Side panels
-        graphics.fillStyle(mainColor);
-        graphics.fillRect(-42, -5, 5, 20);
-        graphics.fillRect(37, -5, 5, 20);
+        // Side armor skirts
+        const darkerColor = Phaser.Display.Color.ValueToColor(mainColor).darken(15).color;
+        graphics.fillStyle(darkerColor);
+        graphics.fillRect(-47, -5, 6, 22);
+        graphics.fillRect(41, -5, 6, 22);
+
+        // Engine compartment (back of tank)
+        const enginePos = facingRight ? -38 : 32;
+        graphics.fillStyle(darkerColor);
+        graphics.fillRect(enginePos, -8, 12, 20);
+
+        // Engine louvers
+        graphics.fillStyle(0x222222);
+        for (let i = 0; i < 4; i++) {
+            graphics.fillRect(enginePos + 2, -6 + i * 5, 8, 2);
+        }
+
+        // Exhaust pipe
+        graphics.fillStyle(0x333333);
+        const exhaustX = facingRight ? -45 : 43;
+        graphics.fillCircle(exhaustX, 5, 4);
+        graphics.fillStyle(0x222222);
+        graphics.fillCircle(exhaustX, 5, 2);
+
+        // Hull rivets
+        graphics.fillStyle(0x555555);
+        const rivetPositions = [-35, -20, -5, 10, 25, 35];
+        rivetPositions.forEach(rx => {
+            graphics.fillCircle(rx, -9, 2);
+            graphics.fillCircle(rx, 14, 2);
+        });
+
+        // Front armor detail
+        const frontPos = facingRight ? 35 : -40;
+        graphics.fillStyle(lightColor);
+        graphics.fillRoundedRect(frontPos, -8, 8, 18, 2);
+
+        // View port / driver's slit
+        graphics.fillStyle(0x111111);
+        graphics.fillRect(facingRight ? 25 : -30, -8, 12, 4);
+        graphics.fillStyle(0x88ccff, 0.3);
+        graphics.fillRect(facingRight ? 26 : -29, -7, 10, 2);
 
         // Outline
         graphics.lineStyle(2, 0x000000);
-        graphics.strokeRoundedRect(-40, -10, 80, 30, 5);
+        graphics.strokeRoundedRect(-45, -12, 90, 32, 6);
     }
 
     // ==========================================
@@ -420,7 +661,7 @@ window.GameScene = class GameScene extends Phaser.Scene {
         }).setOrigin(0.5).setDepth(201);
 
         // Turn indicator subtitle
-        this.turnSubtext = this.add.text(centerX, 48, 'Click & Drag near tank to aim', {
+        this.turnSubtext = this.add.text(centerX, 48, 'Aim with mouse, press SPACE to shoot', {
             fontSize: '12px',
             fontFamily: 'Arial',
             color: '#aaaaaa'
@@ -522,7 +763,7 @@ window.GameScene = class GameScene extends Phaser.Scene {
 
     updateHealthBar(tank) {
         const healthPercent = tank.health / tank.maxHealth;
-        const barWidth = 64 * healthPercent;
+        const barWidth = 74 * healthPercent;
 
         // Update fill width
         tank.healthBarFill.width = barWidth;
@@ -573,84 +814,342 @@ window.GameScene = class GameScene extends Phaser.Scene {
     }
 
     // ==========================================
-    // INPUT & AIMING (Improved Smoothness)
+    // CHARGE-UP BAR SHOOTING SYSTEM
     // ==========================================
-    setupInput() {
-        this.input.on('pointerdown', this.onPointerDown, this);
-        this.input.on('pointermove', this.onPointerMove, this);
-        this.input.on('pointerup', this.onPointerUp, this);
+    createTimingBar() {
+        const width = this.scale.width;
+        const height = this.scale.height;
+        const centerX = width / 2;
+        const barY = height - 60;
+
+        // Container for all timing bar elements
+        this.timingBarContainer = this.add.container(centerX, barY);
+        this.timingBarContainer.setDepth(300);
+        this.timingBarContainer.setAlpha(0); // Hidden initially
+
+        // Background bar
+        const barBg = this.add.rectangle(0, 0, this.timingBarWidth + 20, 50, 0x1a1a2e, 0.95);
+        barBg.setStrokeStyle(3, 0x444466);
+
+        // Main bar background (empty)
+        const mainBarBg = this.add.rectangle(0, 0, this.timingBarWidth, 28, 0x222233);
+        mainBarBg.setStrokeStyle(2, 0x111122);
+
+        // Charge fill bar (grows as player holds SPACE)
+        this.chargeFill = this.add.rectangle(
+            -this.timingBarWidth / 2, 0,
+            0, 24,
+            0x44aaff
+        );
+        this.chargeFill.setOrigin(0, 0.5);
+
+        // Target pin indicator (shows where to stop)
+        this.targetPin = this.add.graphics();
+        this.drawTargetPin();
+
+        // Instruction text
+        this.timingInstruction = this.add.text(0, -38, '⬜ Hold SPACE to charge, release to fire!', {
+            fontSize: '13px',
+            fontFamily: 'Arial Black',
+            color: '#ffffff',
+            stroke: '#000000',
+            strokeThickness: 2
+        }).setOrigin(0.5);
+
+        // Accuracy labels
+        const underLabel = this.add.text(-this.timingBarWidth / 3, 22, '← WEAK', {
+            fontSize: '10px',
+            fontFamily: 'Arial',
+            color: '#6688cc',
+            fontStyle: 'bold'
+        }).setOrigin(0.5, 0);
+
+        const overLabel = this.add.text(this.timingBarWidth / 3, 22, 'STRONG →', {
+            fontSize: '10px',
+            fontFamily: 'Arial',
+            color: '#cc8866',
+            fontStyle: 'bold'
+        }).setOrigin(0.5, 0);
+
+        // Add all elements to container
+        this.timingBarContainer.add([
+            barBg, mainBarBg, this.chargeFill, this.targetPin,
+            this.timingInstruction, underLabel, overLabel
+        ]);
     }
 
-    onPointerDown(pointer) {
-        if (!this.canShoot || this.gameOver || this.currentPlayerIndex !== 0) return;
+    drawTargetPin() {
+        this.targetPin.clear();
 
-        const activeTank = this.tanks[this.currentPlayerIndex];
-        const distance = Phaser.Math.Distance.Between(
-            pointer.x, pointer.y,
-            activeTank.pivotX, activeTank.pivotY
-        );
+        // Calculate pin X position
+        const pinX = (this.targetPinPosition - 0.5) * this.timingBarWidth;
 
-        // Allow aiming from anywhere on screen for easier control
-        if (distance < 200) {
-            this.isAiming = true;
-            this.aimStartX = pointer.x;
-            this.aimStartY = pointer.y;
+        // Perfect zone background
+        const zoneWidth = this.timingBarWidth * this.perfectZoneSize;
+        this.targetPin.fillStyle(0x44ff44, 0.3);
+        this.targetPin.fillRect(pinX - zoneWidth / 2, -14, zoneWidth, 28);
 
-            // Initialize smooth values
-            this.targetAngle = activeTank.barrel.rotation;
-            this.currentAngle = activeTank.barrel.rotation;
-            this.targetPower = this.MIN_POWER;
-            this.smoothPower = this.MIN_POWER;
+        // Target line
+        this.targetPin.lineStyle(4, 0x44ff44);
+        this.targetPin.beginPath();
+        this.targetPin.moveTo(pinX, -16);
+        this.targetPin.lineTo(pinX, 16);
+        this.targetPin.strokePath();
 
-            // Resume audio context on user interaction (browser requirement)
-            if (this.audioContext && this.audioContext.state === 'suspended') {
-                this.audioContext.resume();
-            }
+        // Target arrow pointing down
+        this.targetPin.fillStyle(0xff4444);
+        this.targetPin.fillTriangle(pinX - 10, -20, pinX + 10, -20, pinX, -10);
+
+        // Target label
+        this.targetPin.fillStyle(0xffffff);
+        this.targetPin.fillCircle(pinX, -24, 6);
+
+        // "TARGET" text above
+        if (!this.targetLabel) {
+            this.targetLabel = this.add.text(0, -26, '🎯', {
+                fontSize: '14px'
+            }).setOrigin(0.5);
+            this.timingBarContainer.add(this.targetLabel);
+        }
+        this.targetLabel.x = pinX;
+    }
+
+    showTimingBar() {
+        this.isTimingActive = true;
+        this.isCharging = false;
+        this.chargeLevel = 0;
+
+        // Set random target position (between 0.25 and 0.85 for fairness)
+        this.targetPinPosition = 0.25 + Math.random() * 0.6;
+
+        // Redraw target pin at new position
+        this.drawTargetPin();
+
+        // Reset charge fill
+        this.chargeFill.width = 0;
+        this.chargeFill.setFillStyle(0x44aaff);
+
+        // Animate in
+        this.tweens.add({
+            targets: this.timingBarContainer,
+            alpha: 1,
+            y: this.scale.height - 60,
+            duration: 300,
+            ease: 'Power2'
+        });
+
+        // Update instruction
+        this.timingInstruction.setText('⬜ Hold SPACE to charge, release to fire!');
+    }
+
+    hideTimingBar() {
+        this.isTimingActive = false;
+        this.isCharging = false;
+
+        this.tweens.add({
+            targets: this.timingBarContainer,
+            alpha: 0,
+            duration: 200
+        });
+    }
+
+    startCharging() {
+        if (!this.isTimingActive || this.isCharging || !this.canShoot) return;
+
+        this.isCharging = true;
+        this.chargeLevel = 0;
+        this.chargeFill.width = 0;
+
+        // Update instruction
+        this.timingInstruction.setText('🔥 CHARGING... Release at the target!');
+
+        // Play charging sound cue
+        if (this.audioContext && this.audioContext.state === 'suspended') {
+            this.audioContext.resume();
         }
     }
 
-    onPointerMove(pointer) {
-        if (!this.isAiming) return;
+    updateCharging(delta) {
+        if (!this.isCharging) return;
+
+        // Increase charge level
+        this.chargeLevel += this.chargeRate * (delta / 1000);
+
+        // Clamp to max
+        if (this.chargeLevel >= 1) {
+            this.chargeLevel = 1;
+            // Auto-fire at max charge
+            this.releaseShot();
+            return;
+        }
+
+        // Update visual fill
+        this.chargeFill.width = this.chargeLevel * this.timingBarWidth;
+
+        // Color changes as we approach/pass target
+        const distanceToTarget = Math.abs(this.chargeLevel - this.targetPinPosition);
+        if (distanceToTarget < this.perfectZoneSize / 2) {
+            this.chargeFill.setFillStyle(0x44ff44); // Green - in target zone
+        } else if (this.chargeLevel < this.targetPinPosition) {
+            this.chargeFill.setFillStyle(0x44aaff); // Blue - under target
+        } else {
+            this.chargeFill.setFillStyle(0xff6644); // Orange/red - over target
+        }
+    }
+
+    releaseShot() {
+        if (!this.isCharging) return;
+
+        this.isCharging = false;
+
+        // Calculate accuracy based on distance to target
+        const accuracy = this.calculateShotAccuracy();
+
+        // Hide timing bar
+        this.hideTimingBar();
+        this.aimLine.clear();
+        this.aimIndicator.clear();
 
         const activeTank = this.tanks[this.currentPlayerIndex];
 
-        // Calculate angle from tank DIRECTLY toward cursor (no inversion - follow cursor)
+        // Calculate power based on accuracy
+        const basePower = 900;
+        const finalPower = basePower * accuracy.powerMultiplier;
+
+        // Show accuracy feedback
+        this.showAccuracyFeedback(accuracy.zone, accuracy.accuracy);
+
+        // Fire the projectile
+        this.fireProjectile(activeTank, this.currentAimAngle, finalPower);
+    }
+
+    calculateShotAccuracy() {
+        // Distance from charge level to target
+        const distance = Math.abs(this.chargeLevel - this.targetPinPosition);
+        const perfectThreshold = this.perfectZoneSize / 2;
+
+        if (distance <= perfectThreshold) {
+            // Perfect shot!
+            const perfectness = 1 - (distance / perfectThreshold);
+            return {
+                zone: 'perfect',
+                accuracy: perfectness,
+                powerMultiplier: 0.95 + perfectness * 0.05 // 95-100%
+            };
+        } else if (this.chargeLevel < this.targetPinPosition) {
+            // Under-charged - weak shot
+            const weakness = (this.targetPinPosition - this.chargeLevel) / this.targetPinPosition;
+            return {
+                zone: 'weak',
+                accuracy: 0,
+                powerMultiplier: 0.3 + (1 - weakness) * 0.5 // 30-80%
+            };
+        } else {
+            // Over-charged - too strong
+            const excess = (this.chargeLevel - this.targetPinPosition) / (1 - this.targetPinPosition);
+            return {
+                zone: 'strong',
+                accuracy: 0,
+                powerMultiplier: 1.1 + excess * 0.4 // 110-150%
+            };
+        }
+    }
+
+    showAccuracyFeedback(zone, accuracy) {
+        let message, color;
+
+        switch (zone) {
+            case 'perfect':
+                message = accuracy > 0.8 ? '⭐ PERFECT! ⭐' : '✓ Good shot!';
+                color = '#44ff44';
+                break;
+            case 'weak':
+                message = '📉 Too weak...';
+                color = '#6688ff';
+                break;
+            case 'strong':
+                message = '📈 Too strong!';
+                color = '#ff8844';
+                break;
+        }
+
+        const text = this.add.text(this.scale.width / 2, this.scale.height / 2 - 50, message, {
+            fontSize: '32px',
+            fontFamily: 'Arial Black',
+            color: color,
+            stroke: '#000000',
+            strokeThickness: 4
+        }).setOrigin(0.5).setDepth(400);
+
+        this.tweens.add({
+            targets: text,
+            alpha: { from: 1, to: 0 },
+            y: text.y - 60,
+            scale: { from: 1, to: 1.3 },
+            duration: 1200,
+            onComplete: () => text.destroy()
+        });
+    }
+
+    // ==========================================
+    // INPUT & AIMING (Improved Smoothness)
+    // ==========================================
+    setupInput() {
+        this.input.on('pointermove', this.onPointerMove, this);
+
+        // SPACEBAR hold to charge, release to fire
+        this.input.keyboard.on('keydown-SPACE', () => {
+            if (this.isTimingActive && this.canShoot && !this.gameOver && this.currentPlayerIndex === 0) {
+                this.startCharging();
+            }
+        });
+
+        this.input.keyboard.on('keyup-SPACE', () => {
+            if (this.isCharging && this.canShoot && !this.gameOver && this.currentPlayerIndex === 0) {
+                this.releaseShot();
+            }
+        });
+    }
+
+    onPointerMove(pointer) {
+        // Only allow aiming during player's turn
+        if (this.gameOver || this.currentPlayerIndex !== 0 || !this.canShoot) return;
+
+        const activeTank = this.tanks[this.currentPlayerIndex];
+
+        // Calculate angle from tank toward cursor
         const angle = Phaser.Math.Angle.Between(
             activeTank.pivotX, activeTank.pivotY,
             pointer.x, pointer.y
         );
 
-        // Calculate distance for power (with higher multiplier for longer shots)
-        const distance = Phaser.Math.Distance.Between(
-            activeTank.pivotX, activeTank.pivotY,
-            pointer.x, pointer.y
-        );
+        // Smooth interpolation for angle
+        this.currentAngle = Phaser.Math.Linear(this.currentAngle, angle, this.aimLerpSpeed);
+        this.currentAimAngle = this.currentAngle;
 
-        // Use higher multiplier for more responsive power scaling
-        const rawPower = distance * this.POWER_MULTIPLIER;
-        this.targetPower = Phaser.Math.Clamp(rawPower, this.MIN_POWER, this.MAX_POWER);
-        this.targetAngle = angle; // Shoot directly toward cursor (no Math.PI offset)
-
-        // Smooth interpolation for both angle and power
-        this.currentAngle = Phaser.Math.Linear(this.currentAngle, this.targetAngle, this.aimLerpSpeed);
-        this.smoothPower = Phaser.Math.Linear(this.smoothPower, this.targetPower, this.aimLerpSpeed * 1.5);
-
-        // Apply smoothed values
+        // Apply to barrel
         activeTank.barrel.rotation = this.currentAngle;
-        this.currentPower = this.smoothPower;
 
-        // Draw aim visualization (follows cursor direction)
-        this.drawAimLine(activeTank, this.currentAngle, this.smoothPower);
-        // Show cursor target indicator instead of pull-back
+        // Show timing bar if not already active
+        if (!this.isTimingActive) {
+            this.showTimingBar();
+
+            // Resume audio context on user interaction
+            if (this.audioContext && this.audioContext.state === 'suspended') {
+                this.audioContext.resume();
+            }
+        }
+
+        // Draw aim visualization
+        this.drawAimLine(activeTank, this.currentAngle, this.MAX_POWER * 0.75);
         this.drawCursorIndicator(activeTank, pointer);
-        this.showPowerIndicator(this.smoothPower);
     }
 
     drawCursorIndicator(tank, pointer) {
         this.aimIndicator.clear();
 
         // Draw crosshair/target at cursor position
-        const size = 15 + (this.smoothPower / this.MAX_POWER) * 10;
+        const size = 20;
 
         // Outer circle
         this.aimIndicator.lineStyle(3, 0xFF4400, 0.8);
@@ -677,24 +1176,24 @@ window.GameScene = class GameScene extends Phaser.Scene {
     drawAimLine(tank, angle, power) {
         this.aimLine.clear();
 
-        const numDots = 20; // More dots for longer trajectory preview
+        const numDots = 20;
         const gravity = 500;
         const velocityX = Math.cos(angle) * power;
         const velocityY = Math.sin(angle) * power;
 
-        // Trajectory dots with gradient - extended time for longer shots
+        // Trajectory dots with gradient
         for (let i = 1; i <= numDots; i++) {
-            const t = i * 0.05; // Smaller time steps for smoother curve
+            const t = i * 0.05;
             const dotX = tank.pivotX + velocityX * t;
             const dotY = tank.pivotY + velocityY * t + 0.5 * gravity * t * t;
 
             // Don't draw dots below ground
-            if (dotY > 640) break;
+            if (dotY > this.groundLevel) break;
 
             const alpha = 1 - (i / numDots) * 0.8;
             const size = 7 - (i / numDots) * 4;
 
-            // Color gradient from yellow to red based on position
+            // Color gradient from yellow to red
             const colorLerp = i / numDots;
             const r = 255;
             const g = Math.floor(255 * (1 - colorLerp * 0.7));
@@ -705,7 +1204,7 @@ window.GameScene = class GameScene extends Phaser.Scene {
         }
 
         // Power line from barrel tip
-        const lineLength = power / 6; // Longer line for better visibility
+        const lineLength = power / 6;
         const startDist = 50;
         const startX = tank.pivotX + Math.cos(angle) * startDist;
         const startY = tank.pivotY + Math.sin(angle) * startDist;
@@ -718,26 +1217,6 @@ window.GameScene = class GameScene extends Phaser.Scene {
         this.aimLine.moveTo(startX, startY);
         this.aimLine.lineTo(endX, endY);
         this.aimLine.strokePath();
-    }
-
-    onPointerUp(pointer) {
-        if (!this.isAiming) return;
-
-        this.isAiming = false;
-        this.aimLine.clear();
-        this.aimIndicator.clear(); // Clear the pull-back indicator
-        this.hidePowerIndicator();
-
-        const activeTank = this.tanks[this.currentPlayerIndex];
-
-        // Use the smoothed values for more consistent feel
-        const finalPower = this.smoothPower;
-        const finalAngle = this.currentAngle;
-
-        // Only fire if there's enough power
-        if (finalPower > this.MIN_POWER + 20) {
-            this.fireProjectile(activeTank, finalAngle, finalPower);
-        }
     }
 
     // ==========================================
@@ -823,46 +1302,14 @@ window.GameScene = class GameScene extends Phaser.Scene {
     onProjectileHitGround() {
         if (!this.projectile) return;
 
-        // Create crater at impact point
-        this.createCrater(this.projectile.x, this.groundLevel);
-
+        // Terrain destruction is handled by createExplosion
         this.createExplosion(this.projectile.x, this.projectile.y, false);
         this.checkNearHits(this.projectile.x, this.projectile.y);
         this.destroyProjectile();
         this.switchTurn();
     }
 
-    createCrater(x, y) {
-        // Track crater position
-        this.craters.push({ x: x, y: y });
 
-        // Draw crater on the crater graphics layer
-        const craterSize = Phaser.Math.Between(30, 50);
-
-        // Dark crater hole
-        this.craterGraphics.fillStyle(0x2a1a0a, 1);
-        this.craterGraphics.fillEllipse(x, y + 5, craterSize, craterSize * 0.4);
-
-        // Crater rim - darker earth
-        this.craterGraphics.fillStyle(0x4a3520, 0.8);
-        this.craterGraphics.fillEllipse(x, y, craterSize + 10, (craterSize + 10) * 0.35);
-
-        // Inner shadow
-        this.craterGraphics.fillStyle(0x1a0a00, 0.6);
-        this.craterGraphics.fillEllipse(x + 3, y + 3, craterSize * 0.7, craterSize * 0.25);
-
-        // Dirt spray particles around crater
-        for (let i = 0; i < 8; i++) {
-            const angle = (i / 8) * Math.PI * 2;
-            const dist = craterSize * 0.6 + Phaser.Math.Between(0, 15);
-            const dirtX = x + Math.cos(angle) * dist;
-            const dirtY = y + Math.sin(angle) * dist * 0.4;
-            const dirtSize = Phaser.Math.Between(3, 8);
-
-            this.craterGraphics.fillStyle(0x5a4530, 0.7);
-            this.craterGraphics.fillCircle(dirtX, dirtY, dirtSize);
-        }
-    }
 
     onProjectileHitTank(tankIndex) {
         if (!this.projectile) return;
@@ -917,7 +1364,7 @@ window.GameScene = class GameScene extends Phaser.Scene {
         this.updateHealthBar(tank);
 
         // Low health smoke effect (Phase 4)
-        if (tank.health <= 30 && tank.health > 0 && !tank.smoking) {
+        if (tank.health <= 300 && tank.health > 0 && !tank.smoking) {
             tank.smoking = true;
             this.createSmokeEffect(tank);
         }
@@ -934,13 +1381,14 @@ window.GameScene = class GameScene extends Phaser.Scene {
         });
 
         // Tint effect via graphics redraw
-        this.drawTankBody(tank.bodyGraphics, color, 0xFFFFFF);
+        this.drawTankBody(tank.bodyGraphics, color, 0xFFFFFF, tank.facingRight);
 
         this.time.delayedCall(200, () => {
             if (tank.health > 0) {
                 this.drawTankBody(tank.bodyGraphics,
-                    tank.health <= 30 ? 0x660000 : tank.bodyColor,
-                    tank.health <= 30 ? 0x880000 : tank.highlightColor
+                    tank.health <= 300 ? 0x660000 : tank.bodyColor,
+                    tank.health <= 300 ? 0x880000 : tank.highlightColor,
+                    tank.facingRight
                 );
             }
         });
@@ -949,7 +1397,7 @@ window.GameScene = class GameScene extends Phaser.Scene {
     createSmokeEffect(tank) {
         // Create smoke particles
         const createSmoke = () => {
-            if (tank.health <= 0 || tank.health > 30) return;
+            if (tank.health <= 0 || tank.health > 300) return;
 
             const smoke = this.add.circle(
                 tank.pivotX + Phaser.Math.Between(-20, 20),
@@ -980,9 +1428,41 @@ window.GameScene = class GameScene extends Phaser.Scene {
     // ==========================================
     createExplosion(x, y, isDirect) {
         const size = isDirect ? 80 : 50;
+        const destructionRadius = size * 0.8; // Radius for destroying terrain
 
         // Play explosion sound
         this.playExplosionSound(isDirect);
+
+        // Terrain Destruction
+        if (this.groundSegments) {
+            let terrainChanged = false;
+
+            this.groundSegments.forEach(segment => {
+                if (!segment.isActive) return;
+
+                // Check distance from explosion center to segment center
+                const segmentCenterX = segment.x + segment.width / 2;
+                // Simple horizontal check effectively creates a "column" destruction
+                // For more circular destruction we'd need more complex segment height adjustments
+                // For now, let's just destroy segments that are close enough horizontally
+                // and where the explosion y is low enough to hit the ground
+
+                // Only destroy if explosion is near ground level (not high in air)
+                if (y >= this.groundLevel - 50) {
+                    if (Math.abs(segmentCenterX - x) < destructionRadius) {
+                        // Destroy segment
+                        segment.isActive = false;
+                        segment.physicsBody.disableBody(true, true);
+                        terrainChanged = true;
+                    }
+                }
+            });
+
+            if (terrainChanged) {
+                this.redrawGround();
+                this.redrawGrass();
+            }
+        }
 
         // Multi-layer explosion
         const colors = [0xFF4400, 0xFFAA00, 0xFFFF00];
@@ -1173,7 +1653,7 @@ window.GameScene = class GameScene extends Phaser.Scene {
         this.canShoot = false;
 
         // Destroyed tank visuals
-        this.drawTankBody(destroyedTank.bodyGraphics, 0x222222, 0x333333);
+        this.drawTankBody(destroyedTank.bodyGraphics, 0x222222, 0x333333, destroyedTank.facingRight);
         destroyedTank.turretBase.clear();
         destroyedTank.turretBase.fillStyle(0x222222);
         destroyedTank.turretBase.fillCircle(0, -15, 18);
@@ -1206,17 +1686,48 @@ window.GameScene = class GameScene extends Phaser.Scene {
     }
 
     restartGame() {
-        this.scene.restart();
+        this.scene.start('IntroScene');
+    }
+
+    updateTankVisuals() {
+        if (!this.tanks) return;
+
+        this.tanks.forEach(tank => {
+            if (!tank.physicsBody) return;
+
+            const x = tank.physicsBody.x;
+            const y = tank.physicsBody.y;
+
+            // Sync visual elements
+            tank.container.setPosition(x, y);
+            tank.barrel.setPosition(x, y - 20);
+
+            tank.pivotX = x;
+            tank.pivotY = y - 20;
+
+            // Health bar and label
+            tank.healthBarBg.setPosition(x, y - 60);
+            tank.healthBarFill.setPosition(x - 37, y - 60);
+            tank.healthText.setPosition(x, y - 60);
+            tank.nameLabel.setPosition(x, y - 80);
+        });
     }
 
     // ==========================================
     // UPDATE LOOP
     // ==========================================
     update(time, delta) {
-        // Handle player tank movement (only during player's turn and when not aiming)
-        if (this.currentPlayerIndex === 0 && this.canShoot && !this.isAiming && !this.gameOver) {
+        // Update charge bar if active
+        this.updateCharging(delta);
+
+        // Handle player tank movement (only during player's turn)
+        if (this.currentPlayerIndex === 0 && this.canShoot && !this.gameOver) {
             this.handlePlayerMovement(delta);
         }
+
+        // Sync tank visuals with physics
+        this.updateTankVisuals();
+
 
         if (this.projectile) {
             // Create trail
@@ -1255,29 +1766,14 @@ window.GameScene = class GameScene extends Phaser.Scene {
         if (moveX !== 0) {
             // Calculate new position with bounds
             const newX = Phaser.Math.Clamp(
-                tank.container.x + moveX,
+                tank.physicsBody.x + moveX,
                 this.TANK_MIN_X,
                 this.TANK_MAX_X
             );
 
-            // Update tank container position
-            tank.container.x = newX;
-
-            // Update barrel position
-            tank.barrel.x = newX;
-
-            // Update pivot point (used for aiming)
-            tank.pivotX = newX;
-
-            // Update health bar and name positions
-            tank.healthBarBg.x = newX;
-            tank.healthBarFill.x = newX - 32;
-            tank.healthText.x = newX;
-            tank.nameLabel.x = newX;
-
-            // Update physics body position
+            // Update physics body position directly
             tank.physicsBody.x = newX;
-            tank.physicsBody.body.reset(newX, tank.physicsBody.y);
+            // Note: Visuals are updated in updateTankVisuals()
         }
     }
 }

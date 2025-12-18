@@ -44,8 +44,11 @@ window.GameScene = class GameScene extends Phaser.Scene {
         this.TANK_MAX_X = 600; // Player tank can only move in left half
 
         // Charge-up bar shooting variables
-        this.groundSegments = [];    // Array to hold ground physics segments
-        this.SEGMENT_WIDTH = 20;     // Width of each ground segment
+        // Canvas-based terrain system
+        this.terrainCanvas = null;
+        this.terrainContext = null;
+        this.terrainSprite = null;
+        this.CRATER_RADIUS = 40;
         this.isTimingActive = false;    // Is the timing bar visible?
         this.isCharging = false;        // Is player holding SPACE to charge?
         this.chargeLevel = 0;           // Current charge level (0-1)
@@ -253,86 +256,82 @@ window.GameScene = class GameScene extends Phaser.Scene {
         hills.closePath();
         hills.fillPath();
 
-        // Destructible Ground Visuals (Graphics object we will redraw)
-        this.groundGraphicsObj = this.add.graphics();
-        this.groundGraphicsObj.setDepth(6);
+        // ==========================================
+        // CANVAS-BASED TERRAIN SYSTEM
+        // ==========================================
+        this.terrainCanvas = document.createElement('canvas');
+        this.terrainCanvas.width = width;
+        this.terrainCanvas.height = height;
+        this.terrainContext = this.terrainCanvas.getContext('2d');
 
-        // Physics Ground Group
-        this.ground = this.physics.add.staticGroup();
-        this.groundSegments = [];
+        // Draw initial ground with gradient
+        const groundHeight = height - this.groundLevel;
+        const gradient = this.terrainContext.createLinearGradient(0, this.groundLevel, 0, height);
+        gradient.addColorStop(0, '#4a7c23');
+        gradient.addColorStop(1, '#3d6b1c');
+        this.terrainContext.fillStyle = gradient;
+        this.terrainContext.fillRect(0, this.groundLevel, width, groundHeight);
 
-        // Determine ground color gradient
-        const topColor = Phaser.Display.Color.ValueToColor(0x4a7c23);
-        const bottomColor = Phaser.Display.Color.ValueToColor(0x3d6b1c);
+        // Add grass on top
+        this.terrainContext.fillStyle = '#5d9c2f';
+        this.terrainContext.fillRect(0, this.groundLevel, width, 6);
 
-        // Create segments
-        const numSegments = Math.ceil(width / this.SEGMENT_WIDTH);
-
-        for (let i = 0; i < numSegments; i++) {
-            const x = i * this.SEGMENT_WIDTH;
-            const segmentHeight = height - this.groundLevel;
-
-            // Visual data for this segment
-            const segment = {
-                x: x,
-                y: this.groundLevel,
-                width: this.SEGMENT_WIDTH,
-                height: segmentHeight,
-                isActive: true,
-                physicsBody: null,
-                index: i
-            };
-
-            // Create physics body for this segment
-            const body = this.add.rectangle(
-                x + this.SEGMENT_WIDTH / 2,
-                this.groundLevel + segmentHeight / 2,
-                this.SEGMENT_WIDTH,
-                segmentHeight,
-                0x000000, 0
-            );
-            this.ground.add(body);
-            segment.physicsBody = body;
-
-            this.groundSegments.push(segment);
+        // Create Phaser texture from canvas
+        if (this.textures.exists('terrain')) {
+            this.textures.remove('terrain');
         }
+        this.textures.addCanvas('terrain', this.terrainCanvas);
+        this.terrainSprite = this.add.image(width / 2, height / 2, 'terrain');
+        this.terrainSprite.setDepth(6);
 
-        // Draw initial ground
-        this.redrawGround();
-
-        // Grass line at top of ground (visual only, will be redrawn)
-        this.grassGraphics = this.add.graphics().setDepth(7);
-        this.redrawGrass();
-
-        // World bounds
+        // World bounds (walls only, ground collision is pixel-based now)
         this.leftWall = this.add.rectangle(-10, height / 2, 20, height, 0x000000, 0);
         this.physics.add.existing(this.leftWall, true);
         this.rightWall = this.add.rectangle(width + 10, height / 2, 20, height, 0x000000, 0);
         this.physics.add.existing(this.rightWall, true);
     }
 
-    redrawGround() {
-        this.groundGraphicsObj.clear();
+    // ==========================================
+    // TERRAIN DESTRUCTION SYSTEM
+    // ==========================================
+    carveTerrainHole(x, y, radius) {
+        // Use canvas compositing to erase a circle
+        this.terrainContext.globalCompositeOperation = 'destination-out';
+        this.terrainContext.beginPath();
+        this.terrainContext.arc(x, y, radius, 0, Math.PI * 2);
+        this.terrainContext.fill();
+        this.terrainContext.globalCompositeOperation = 'source-over';
 
-        // Draw each active segment
-        this.groundSegments.forEach(seg => {
-            if (!seg.isActive) return;
-
-            // Simple gradient fill approximation
-            this.groundGraphicsObj.fillGradientStyle(0x4a7c23, 0x4a7c23, 0x3d6b1c, 0x3d6b1c);
-            this.groundGraphicsObj.fillRect(seg.x, seg.y, seg.width, seg.height);
-        });
+        // Refresh the Phaser texture to reflect changes
+        this.textures.get('terrain').refresh();
     }
 
-    redrawGrass() {
-        this.grassGraphics.clear();
-        this.grassGraphics.fillStyle(0x5d9c2f);
+    isPixelSolid(x, y) {
+        // Check if a pixel at (x, y) is solid terrain
+        if (x < 0 || x >= this.terrainCanvas.width ||
+            y < 0 || y >= this.terrainCanvas.height) {
+            return false;
+        }
+        const pixel = this.terrainContext.getImageData(Math.floor(x), Math.floor(y), 1, 1);
+        return pixel.data[3] > 0; // Check alpha channel
+    }
 
-        this.groundSegments.forEach(seg => {
-            if (!seg.isActive) return;
-            // Draw grass on top of active segments
-            this.grassGraphics.fillRect(seg.x, seg.y, seg.width, 4);
-        });
+    checkTerrainCollision(x, y, radius = 5) {
+        // Check multiple points around the object for collision
+        const points = [
+            { x: x, y: y },
+            { x: x - radius, y: y },
+            { x: x + radius, y: y },
+            { x: x, y: y + radius },
+            { x: x, y: y - radius }
+        ];
+
+        for (const point of points) {
+            if (this.isPixelSolid(point.x, point.y)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     createCloud(x, y) {
@@ -1278,9 +1277,8 @@ window.GameScene = class GameScene extends Phaser.Scene {
     }
 
     setupProjectileCollisions() {
-        this.physics.add.collider(this.projectile, this.ground, () => {
-            this.onProjectileHitGround();
-        });
+        // Note: Ground collision is now pixel-based, checked in update()
+        // Only set up tank and wall colliders here
 
         this.tanks.forEach((tank, index) => {
             this.physics.add.overlap(this.projectile, tank.physicsBody, () => {
@@ -1428,41 +1426,13 @@ window.GameScene = class GameScene extends Phaser.Scene {
     // ==========================================
     createExplosion(x, y, isDirect) {
         const size = isDirect ? 80 : 50;
-        const destructionRadius = size * 0.8; // Radius for destroying terrain
+        const craterRadius = isDirect ? 50 : 35;
 
         // Play explosion sound
         this.playExplosionSound(isDirect);
 
-        // Terrain Destruction
-        if (this.groundSegments) {
-            let terrainChanged = false;
-
-            this.groundSegments.forEach(segment => {
-                if (!segment.isActive) return;
-
-                // Check distance from explosion center to segment center
-                const segmentCenterX = segment.x + segment.width / 2;
-                // Simple horizontal check effectively creates a "column" destruction
-                // For more circular destruction we'd need more complex segment height adjustments
-                // For now, let's just destroy segments that are close enough horizontally
-                // and where the explosion y is low enough to hit the ground
-
-                // Only destroy if explosion is near ground level (not high in air)
-                if (y >= this.groundLevel - 50) {
-                    if (Math.abs(segmentCenterX - x) < destructionRadius) {
-                        // Destroy segment
-                        segment.isActive = false;
-                        segment.physicsBody.disableBody(true, true);
-                        terrainChanged = true;
-                    }
-                }
-            });
-
-            if (terrainChanged) {
-                this.redrawGround();
-                this.redrawGrass();
-            }
-        }
+        // Carve circular hole in terrain (pixel-based destruction)
+        this.carveTerrainHole(x, y, craterRadius);
 
         // Multi-layer explosion
         const colors = [0xFF4400, 0xFFAA00, 0xFFFF00];
@@ -1728,8 +1698,15 @@ window.GameScene = class GameScene extends Phaser.Scene {
         // Sync tank visuals with physics
         this.updateTankVisuals();
 
-
         if (this.projectile) {
+            // Pixel-based ground collision check
+            const px = this.projectile.x;
+            const py = this.projectile.y;
+            if (this.checkTerrainCollision(px, py, 6)) {
+                this.onProjectileHitGround();
+                return; // Exit early since projectile is destroyed
+            }
+
             // Create trail
             const trail = this.add.circle(this.projectile.x, this.projectile.y, 4, 0x666666, 0.5);
             trail.setDepth(35);

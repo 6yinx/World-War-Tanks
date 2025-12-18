@@ -45,11 +45,17 @@ window.IntroScene = class IntroScene extends Phaser.Scene {
     create() {
         console.log('IntroScene: Creating intro sequence...');
 
+        // Get screen dimensions for responsive positioning
+        this.screenWidth = this.scale.width;
+        this.screenHeight = this.scale.height;
+        this.centerX = this.screenWidth / 2;
+        this.centerY = this.screenHeight / 2;
+
         // Create static battlefield silhouette background
         this.createBackground();
 
         // Create skip text (always visible)
-        this.skipText = this.add.text(640, 680, 'Click anywhere to skip', {
+        this.skipText = this.add.text(this.centerX, this.screenHeight - 40, 'Click anywhere to skip', {
             fontSize: '16px',
             fontFamily: 'Arial',
             color: '#ffffff',
@@ -79,35 +85,35 @@ window.IntroScene = class IntroScene extends Phaser.Scene {
 
         // Dark sky gradient
         bg.fillGradientStyle(0x1a1a2e, 0x1a1a2e, 0x2d2d44, 0x2d2d44);
-        bg.fillRect(0, 0, 1280, 720);
+        bg.fillRect(0, 0, this.screenWidth, this.screenHeight);
 
-        // Distant mountains silhouette
+        // Ground height percentage
+        const groundY = this.screenHeight * 0.83;
+
+        // Distant mountains silhouette (scaled to screen)
         bg.fillStyle(0x15152a);
         bg.beginPath();
-        bg.moveTo(0, 600);
-        bg.lineTo(100, 520);
-        bg.lineTo(200, 560);
-        bg.lineTo(350, 480);
-        bg.lineTo(500, 540);
-        bg.lineTo(650, 450);
-        bg.lineTo(800, 520);
-        bg.lineTo(950, 470);
-        bg.lineTo(1100, 530);
-        bg.lineTo(1200, 490);
-        bg.lineTo(1280, 520);
-        bg.lineTo(1280, 720);
-        bg.lineTo(0, 720);
+        bg.moveTo(0, groundY);
+        // Dynamic mountains across screen width
+        const numPoints = 12;
+        for (let i = 0; i <= numPoints; i++) {
+            const x = (i / numPoints) * this.screenWidth;
+            const heightVariation = Math.sin(i * 0.8) * 60 + Math.cos(i * 1.2) * 40;
+            bg.lineTo(x, groundY - 80 - heightVariation);
+        }
+        bg.lineTo(this.screenWidth, this.screenHeight);
+        bg.lineTo(0, this.screenHeight);
         bg.closePath();
         bg.fillPath();
 
         // Ground silhouette
         bg.fillStyle(0x0d0d1a);
-        bg.fillRect(0, 600, 1280, 120);
+        bg.fillRect(0, groundY, this.screenWidth, this.screenHeight - groundY);
 
-        // Add some stars
+        // Add some stars (distributed across screen)
         for (let i = 0; i < 50; i++) {
-            const x = Phaser.Math.Between(0, 1280);
-            const y = Phaser.Math.Between(0, 400);
+            const x = Phaser.Math.Between(0, this.screenWidth);
+            const y = Phaser.Math.Between(0, groundY * 0.6);
             const size = Phaser.Math.FloatBetween(1, 3);
             const alpha = Phaser.Math.FloatBetween(0.3, 1);
 
@@ -132,8 +138,8 @@ window.IntroScene = class IntroScene extends Phaser.Scene {
         this.currentPhase = 0;
         console.log('IntroScene: Phase 0 - Logo');
 
-        // Create logo container
-        this.logoContainer = this.add.container(640, 300);
+        // Create logo container (centered)
+        this.logoContainer = this.add.container(this.centerX, this.centerY - 60);
 
         // Game title with glow effect
         const titleGlow = this.add.text(0, 0, 'WORLD WAR TANKS', {
@@ -160,7 +166,7 @@ window.IntroScene = class IntroScene extends Phaser.Scene {
             fontStyle: 'italic'
         }).setOrigin(0.5).setAlpha(0);
 
-        // Tank silhouettes
+        // Tank silhouettes (relative positioning)
         const tankLeftSil = this.createTankSilhouette(-250, 150, true);
         const tankRightSil = this.createTankSilhouette(250, 150, false);
 
@@ -226,11 +232,11 @@ window.IntroScene = class IntroScene extends Phaser.Scene {
     }
 
     createEngineParticles() {
-        // Create subtle floating particles for atmosphere
+        // Create subtle floating particles for atmosphere (distributed across screen)
         for (let i = 0; i < 20; i++) {
             const particle = this.add.circle(
-                Phaser.Math.Between(0, 1280),
-                Phaser.Math.Between(400, 600),
+                Phaser.Math.Between(0, this.screenWidth),
+                Phaser.Math.Between(this.screenHeight * 0.55, this.screenHeight * 0.85),
                 Phaser.Math.Between(1, 3),
                 0xff6600,
                 Phaser.Math.FloatBetween(0.1, 0.3)
@@ -264,8 +270,8 @@ window.IntroScene = class IntroScene extends Phaser.Scene {
             });
         }
 
-        // Create story container
-        this.storyContainer = this.add.container(640, 300);
+        // Create story container (centered)
+        this.storyContainer = this.add.container(this.centerX, this.centerY - 50);
         this.storyContainer.setAlpha(0);
 
         // Story text elements
@@ -366,16 +372,21 @@ window.IntroScene = class IntroScene extends Phaser.Scene {
     }
 
     createDemoTanks() {
+        // Position tanks based on screen size
+        const tankY = this.screenHeight * 0.74;
+        const leftX = this.screenWidth * 0.15;
+        const rightX = this.screenWidth * 0.85;
+
         // Demo Tank A (left)
-        this.demoTankA = this.createDemoTank(200, 530, 0x556B2F, true);
+        this.demoTankA = this.createDemoTank(leftX, tankY, 0x556B2F, true);
         this.demoTankA.container.setAlpha(0);
 
         // Demo Tank B (right)
-        this.demoTankB = this.createDemoTank(1080, 530, 0x8B7355, false);
+        this.demoTankB = this.createDemoTank(rightX, tankY, 0x8B7355, false);
         this.demoTankB.container.setAlpha(0);
 
-        // "VS" text
-        this.vsText = this.add.text(640, 400, 'VS', {
+        // "VS" text (centered)
+        this.vsText = this.add.text(this.centerX, this.centerY + 40, 'VS', {
             fontSize: '64px',
             fontFamily: 'Impact, Arial Black',
             color: '#ff4400',
@@ -387,7 +398,7 @@ window.IntroScene = class IntroScene extends Phaser.Scene {
         this.tweens.add({
             targets: this.demoTankA.container,
             alpha: 1,
-            x: { from: -100, to: 200 },
+            x: { from: -100, to: leftX },
             duration: 800,
             ease: 'Power2'
         });
@@ -395,7 +406,7 @@ window.IntroScene = class IntroScene extends Phaser.Scene {
         this.tweens.add({
             targets: this.demoTankB.container,
             alpha: 1,
-            x: { from: 1380, to: 1080 },
+            x: { from: this.screenWidth + 100, to: rightX },
             duration: 800,
             ease: 'Power2'
         });
@@ -448,17 +459,15 @@ window.IntroScene = class IntroScene extends Phaser.Scene {
     }
 
     fireDemoShot() {
-        // Create projectile from Tank A
-        const startX = 240;
-        const startY = 500;
+        // Calculate positions based on screen size
+        const startX = this.screenWidth * 0.18;
+        const startY = this.screenHeight * 0.70;
+        const endX = this.screenWidth * 0.82;
+        const endY = this.screenHeight * 0.74;
+        const peakY = this.screenHeight * 0.28;
 
         this.demoProjectile = this.add.circle(startX, startY, 10, 0x333333);
         this.demoProjectile.setStrokeStyle(2, 0x000000);
-
-        // Animate projectile in arc
-        const endX = 1050;
-        const endY = 530;
-        const peakY = 200;
 
         // Create trail effect
         this.projectileTrail = [];
@@ -564,8 +573,8 @@ window.IntroScene = class IntroScene extends Phaser.Scene {
         // Update skip text
         this.skipText.setText('');
 
-        // Create start screen container
-        this.startContainer = this.add.container(640, 360);
+        // Create start screen container (centered)
+        this.startContainer = this.add.container(this.centerX, this.centerY);
         this.startContainer.setAlpha(0);
 
         // Title
@@ -602,9 +611,9 @@ window.IntroScene = class IntroScene extends Phaser.Scene {
             color: '#ffffff'
         }).setOrigin(0.5);
 
-        // Controls hint
-        const hint = this.add.text(0, 130, 'Click and drag to aim. Release to fire.', {
-            fontSize: '18px',
+        // Controls hint - updated to include movement controls
+        const hint = this.add.text(0, 130, 'A/D or Arrow Keys to move | Click to aim and shoot', {
+            fontSize: '16px',
             fontFamily: 'Arial',
             color: '#aaaaaa',
             fontStyle: 'italic'
@@ -706,7 +715,7 @@ window.IntroScene = class IntroScene extends Phaser.Scene {
         console.log('IntroScene: Starting game!');
 
         // Quick flash transition
-        const flash = this.add.rectangle(640, 360, 1280, 720, 0xFFFFFF, 0);
+        const flash = this.add.rectangle(this.centerX, this.centerY, this.screenWidth, this.screenHeight, 0xFFFFFF, 0);
         flash.setDepth(1000);
 
         this.tweens.add({

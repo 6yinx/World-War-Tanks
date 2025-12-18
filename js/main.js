@@ -24,10 +24,11 @@ window.onload = () => {
     const config = {
         type: Phaser.AUTO,
         scale: {
-            mode: Phaser.Scale.RESIZE,
+            mode: Phaser.Scale.FIT,
+            autoCenter: Phaser.Scale.CENTER_BOTH,
             parent: 'game-container',
-            width: '100%',
-            height: '100%'
+            width: 1280,
+            height: 720
         },
         physics: {
             default: 'arcade',

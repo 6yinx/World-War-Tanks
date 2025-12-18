@@ -284,7 +284,12 @@ window.GameScene = class GameScene extends Phaser.Scene {
         this.terrainSprite = this.add.image(width / 2, height / 2, 'terrain');
         this.terrainSprite.setDepth(6);
 
-        // World bounds (walls only, ground collision is pixel-based now)
+        // Physics ground body for tanks to stand on (invisible but solid)
+        this.ground = this.physics.add.staticGroup();
+        const groundBody = this.add.rectangle(width / 2, this.groundLevel + groundHeight / 2, width, groundHeight, 0x000000, 0);
+        this.ground.add(groundBody);
+
+        // World bounds (walls)
         this.leftWall = this.add.rectangle(-10, height / 2, 20, height, 0x000000, 0);
         this.physics.add.existing(this.leftWall, true);
         this.rightWall = this.add.rectangle(width + 10, height / 2, 20, height, 0x000000, 0);
@@ -1010,16 +1015,39 @@ window.GameScene = class GameScene extends Phaser.Scene {
         this.aimIndicator.clear();
 
         const activeTank = this.tanks[this.currentPlayerIndex];
-
-        // Calculate power based on accuracy
-        const basePower = 900;
-        const finalPower = basePower * accuracy.powerMultiplier;
+        const targetTank = this.tanks[this.currentPlayerIndex === 0 ? 1 : 0];
 
         // Show accuracy feedback
         this.showAccuracyFeedback(accuracy.zone, accuracy.accuracy);
 
+        let finalAngle, finalPower;
+
+        if (accuracy.zone === 'perfect') {
+            // PERFECT TIMING: Auto-aim at opponent!
+            const solution = this.calculateFiringSolution(
+                activeTank.pivotX, activeTank.pivotY,
+                targetTank.pivotX, targetTank.pivotY
+            );
+
+            if (solution) {
+                finalAngle = solution.angle;
+                // Add small random variation so it's not 100% perfect every time
+                const variation = (1 - accuracy.accuracy) * 50;
+                finalPower = solution.power + Phaser.Math.Between(-variation, variation);
+            } else {
+                // Fallback if no solution found
+                finalAngle = this.currentAimAngle;
+                finalPower = 900;
+            }
+        } else {
+            // WEAK or STRONG timing: Use current aim angle with power penalty
+            finalAngle = this.currentAimAngle;
+            const basePower = 900;
+            finalPower = basePower * accuracy.powerMultiplier;
+        }
+
         // Fire the projectile
-        this.fireProjectile(activeTank, this.currentAimAngle, finalPower);
+        this.fireProjectile(activeTank, finalAngle, finalPower);
     }
 
     calculateShotAccuracy() {
@@ -1541,32 +1569,38 @@ window.GameScene = class GameScene extends Phaser.Scene {
         const dy = targetY - y0;
         const g = 500; // gravity
 
-        // Try a few angles to find a valid power
-        // Bot is on the right, so angles should be around 180-270 degrees (PI to 1.5PI)
-        const testAngles = [
-            Math.PI + 0.35, // Low arc
-            Math.PI + 0.6,  // Mid arc
-            Math.PI + 0.85  // High arc
-        ];
+        // Choose angles based on direction
+        let testAngles;
+        if (dx > 0) {
+            // Shooting right (player)
+            testAngles = [
+                -0.35, // Low arc
+                -0.5,  // Mid arc
+                -0.7   // High arc
+            ];
+        } else {
+            // Shooting left (bot)
+            testAngles = [
+                Math.PI + 0.35, // Low arc
+                Math.PI + 0.5,  // Mid arc
+                Math.PI + 0.7   // High arc
+            ];
+        }
 
         // Pick a random angle for variety
         const angle = Phaser.Utils.Array.GetRandom(testAngles);
 
-        // Trajectory formula derived for v
-        // v = sqrt( (g * x^2) / (2 * cos^2(a) * (x * tan(a) - y)) )
-        // Note: My previous derivation had y and x signs handled implicitly by dx/dy
-        // y(x) = x * tan(a) - (g * x^2) / (2 * v^2 * cos^2(a))
-        // So: (g * x^2) / (2 * v^2 * cos^2(a)) = x * tan(a) - y
-        // v^2 = (g * x^2) / (2 * cos^2(a) * (x * tan(a) - y))
-
+        // Trajectory formula: v = sqrt( (g * x^2) / (2 * cos^2(a) * (x * tan(a) - y)) )
         const cosA = Math.cos(angle);
         const tanA = Math.tan(angle);
 
         const term = dx * tanA - dy;
 
-        if (term <= 0.001) return null; // No solution for this angle (target too high or wrong direction)
+        if (term <= 0.001) return null; // No solution for this angle
 
         const v2 = (g * dx * dx) / (2 * cosA * cosA * term);
+        if (v2 < 0) return null; // No valid solution
+
         const v = Math.sqrt(v2);
 
         return { angle: angle, power: v };
